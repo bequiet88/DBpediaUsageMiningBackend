@@ -19,7 +19,7 @@ case class CommonLogFile(
     time: String,
     timezone: String,
     requestMethod: String,
-    requestUrl: String,
+    request: Map[String, String],
     requestProtocol: String,
     httpStatus: String)
 //    size: String,

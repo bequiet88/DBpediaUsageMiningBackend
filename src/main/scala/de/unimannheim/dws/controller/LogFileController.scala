@@ -11,6 +11,9 @@ import scala.util.matching.Regex
 import java.io.File
 import java.io.FileInputStream
 
+// http://www.tutorialspoint.com/scala/scala_regular_expressions.htm
+// http://www.regexplanet.com/advanced/java/index.html
+
 object LogFileController extends App {
   
   /*
@@ -18,6 +21,8 @@ object LogFileController extends App {
    */
   RegisterConversionHelpers() 
   RegisterJodaTimeConversionHelpers()
+  
+  //val filesHere = (new java.io.File(".")).listFiles
   
   val path = "D:/Download/Uni_Projekte/Master_Thesis/usewod2014-dataset/USEWOD2014/data/DBpedia/dbpedia3.8/http07082013.log/http07082013.log"
     
