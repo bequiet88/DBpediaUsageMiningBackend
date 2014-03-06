@@ -18,4 +18,8 @@ libraryDependencies ++= Seq(
 
 scalacOptions in Test ++= Seq("-Yrangepos")
 
+//resolvers ++= Seq(
+//  Resolver.url("apache.snapshots.https", new URL("https://repository.apache.org/content/repositories/snapshots/"))
+//)
+
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)

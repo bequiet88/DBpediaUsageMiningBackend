@@ -20,7 +20,7 @@ import de.unimannheim.dws.models.mongo.SparqlQueryDAO
 
 // http://notes.3kbo.com/scala
 
-object TripleExtractorController extends App {
+object StatisticController extends App {
 
   /*
    * Converters for Joda Time
@@ -30,37 +30,21 @@ object TripleExtractorController extends App {
 
   val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
     .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
+//    .skip(1)
+//    .limit(613)
     .toList
-
-  //  rawCLFs.map(o => println(o.toString))
-
-  for (log <- rawCLFs) {
-    /*
-     * Get the query string from the log entry
-     */
-    val queryString = log.request.get("query") match {
-      case Some(query) => query
+ 
+  val formats = for {
+    log <- rawCLFs
+    format = log.request.get("format") match {
+      case Some(format) => format
       case _ => ""
     }
+  } yield format
     
-    try {
+  val formatDistribution = formats.groupBy(l => l).map(t => (t._1, t._2.length))
+    
+  println(formatDistribution.toString)
+    
 
-      /*
-       * Try to create valid SPARQL query
-       */
-      val query: Query = QueryFactory.create(queryString)
-
-      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
-
-      val seqOfTriples = TripleExtractor.extract(query, id.get)
-
-      SimpleTripleDAO.insert(seqOfTriples)
-
-    } catch {
-      case e: Exception => {
-        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-      }
-    }
-
-  }
 }

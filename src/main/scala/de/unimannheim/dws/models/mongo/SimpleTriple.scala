@@ -11,11 +11,14 @@ import com.novus.salat.annotations.raw.Key
 // https://github.com/novus/salat/wiki/SalatDAO
 
 case class SimpleTriple(
-    @Key("_id") _id: ObjectId = new ObjectId, 
+    @Key("_id") _id: ObjectId = new ObjectId,
+    sub_type: String,
     sub_pref: String, 
     sub_ent: String,
+    pred_type: String,
     pred_pref: String,
     pred_prop: String, // strftime format %d/%b/%Y:%H:%M:%S %z.
+    obj_type: String,
     obj_pref: String,
     obj_ent: String,
     queryId: ObjectId)
