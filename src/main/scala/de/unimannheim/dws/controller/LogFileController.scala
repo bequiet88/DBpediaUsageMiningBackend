@@ -47,7 +47,7 @@ object LogFileController extends App {
   
   for (line <- source.getLines()){
     val o = LogFileParser.parse(format, line)
-    CommonLogFileDAO.insert(o)
+    if(o != null) CommonLogFileDAO.insert(o)
   }
   
   

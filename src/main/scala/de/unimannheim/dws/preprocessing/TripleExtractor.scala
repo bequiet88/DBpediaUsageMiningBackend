@@ -33,10 +33,10 @@ object TripleExtractor {
       } else if (node.isLiteral()) {
         (node.getLiteralDatatypeURI(), node.getLiteralLexicalForm() + node.getLiteralLanguage(), "literal")
       } else if (node.isVariable()) {
-        ("", "?" + node.getName(), "var")
+        ("-", "?" + node.getName(), "var")
       } else if (node.isBlank()) {
-        ("", node.getBlankNodeLabel(), "blank")
-      } else ("", "", "")
+        ("-", node.getBlankNodeLabel(), "blank")
+      } else ("-", "-", "-")
     }
 
     val elems: List[Element] = query.getQueryPattern() match {

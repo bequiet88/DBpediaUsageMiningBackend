@@ -8,7 +8,7 @@ import org.bson.types.ObjectId
 import org.joda.time.DateTime
 import com.novus.salat.annotations.raw.Key
 
-// https://github.com/novus/salat/wiki/SalatDAO
+// https://github.com/novus/salat/wiki
 
 case class SimpleTriple(
     @Key("_id") _id: ObjectId = new ObjectId,
