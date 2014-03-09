@@ -42,12 +42,15 @@ object LogFileParser {
               case true => requestTuple(0).replace("/sparql?", "")
               case _ => requestTuple(0)
             }
-            val valueUnicodeRemoved = new Regex("%u\\w{4}").replaceAllIn(requestTuple(1), "")
-            try {
-              val value = URLDecoder.decode(valueUnicodeRemoved)
-              (key, value)
-            } catch {
-              case iae: java.lang.IllegalArgumentException => ("error", "error")
+            if (key.contains(".")) ("error", "error")
+            else {
+              val valueUnicodeRemoved = new Regex("%u\\w{4}").replaceAllIn(requestTuple(1), "")
+              try {
+                val value = URLDecoder.decode(valueUnicodeRemoved)
+                (key, value)
+              } catch {
+                case iae: java.lang.IllegalArgumentException => ("error", "error")
+              }
             }
           }
           case _ => ("error", "error")

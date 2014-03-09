@@ -19,6 +19,11 @@ import de.unimannheim.dws.models.mongo.SparqlQuery
 import de.unimannheim.dws.models.mongo.SparqlQueryDAO
 
 // http://notes.3kbo.com/scala
+// http://joernhees.de/blog/2010/10/31/setting-up-a-local-dbpedia-mirror-with-virtuoso/
+
+/*
+ * Jena ARQ parser cannot parse all Virtuoso SPARQL queries correctly!!! 
+ */
 
 object TripleExtractorController extends App {
 
@@ -34,7 +39,7 @@ object TripleExtractorController extends App {
 
   //  rawCLFs.map(o => println(o.toString))
 
-  for (log <- rawCLFs) {
+  val queriesTriples = for (log <- rawCLFs) yield {
     /*
      * Get the query string from the log entry
      */
@@ -50,17 +55,31 @@ object TripleExtractorController extends App {
        */
       val query: Query = QueryFactory.create(queryString)
 
-      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
+//      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
 
-      val seqOfTriples = TripleExtractor.extract(query, id.get)
+      val sparqlQuery = SparqlQuery(query = queryString, containsErrors = false)
+      
+      val seqOfTriples = TripleExtractor.extract(query, sparqlQuery._id)
 
-      SimpleTripleDAO.insert(seqOfTriples)
+      (sparqlQuery, seqOfTriples)
 
     } catch {
       case e: Exception => {
-        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
+//        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
+        (SparqlQuery(query = queryString, containsErrors = true), Seq())
       }
     }
 
   }
+  
+  /*
+   * Insert queries and triples into doc store
+   */
+  val queries = queriesTriples.map(_._1)  
+  SparqlQueryDAO.insert(queries)
+  
+  val triples = queriesTriples.map(_._2).flatten
+  SimpleTripleDAO.insert(triples)
+  
+  
 }

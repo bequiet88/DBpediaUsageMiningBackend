@@ -28,13 +28,13 @@ object TripleExtractor {
      */
     def getNodeInfo(node: Node) = {
 
-      if (node.isURI()) {
+      if (node.isURI() && node.getNameSpace() != null && node.getLocalName() != null) {
         (node.getNameSpace(), node.getLocalName(), "uri")
-      } else if (node.isLiteral()) {
-        (node.getLiteralDatatypeURI(), node.getLiteralLexicalForm() + node.getLiteralLanguage(), "literal")
-      } else if (node.isVariable()) {
+      } else if (node.isLiteral() && node.getLiteralLexicalForm() != null && node.getLiteralLanguage()!= null) {
+        ("-", node.getLiteralLexicalForm() + node.getLiteralLanguage(), "literal")
+      } else if (node.isVariable() && node.getName() != null) {
         ("-", "?" + node.getName(), "var")
-      } else if (node.isBlank()) {
+      } else if (node.isBlank() && node.getBlankNodeLabel() != null) {
         ("-", node.getBlankNodeLabel(), "blank")
       } else ("-", "-", "-")
     }
@@ -64,6 +64,8 @@ object TripleExtractor {
       val subjInfo = getNodeInfo(subj)
       val predInfo = getNodeInfo(pred)
       val objInfo = getNodeInfo(obj)
+      
+      println(objInfo)
 
       SimpleTriple(
         sub_pref = subjInfo._1,
