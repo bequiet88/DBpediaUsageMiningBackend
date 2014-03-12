@@ -10,7 +10,6 @@ import de.unimannheim.dws.preprocessing.LogFileParser
 import scala.util.matching.Regex
 import java.io.File
 import java.io.FileInputStream
-import de.unimannheim.dws.preprocessing.TripleExtractor
 import de.unimannheim.dws.models.mongo.SimpleTripleDAO
 import com.hp.hpl.jena.query.QueryFactory
 import com.hp.hpl.jena.query.QueryParseException

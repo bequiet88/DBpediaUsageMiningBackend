@@ -1,22 +1,18 @@
 package de.unimannheim.dws.controller
 
-import de.unimannheim.dws.models.mongo.CommonLogFile
 import org.bson.types.ObjectId
-import org.joda.time.DateTime
-import de.unimannheim.dws.models.mongo.CommonLogFileDAO
-import com.mongodb.casbah.commons.MongoDBObject
-import com.mongodb.casbah.commons.conversions.scala.{ RegisterConversionHelpers, RegisterJodaTimeConversionHelpers }
-import de.unimannheim.dws.preprocessing.LogFileParser
-import scala.util.matching.Regex
-import java.io.File
-import java.io.FileInputStream
-import de.unimannheim.dws.preprocessing.TripleExtractor
-import de.unimannheim.dws.models.mongo.SimpleTripleDAO
-import com.hp.hpl.jena.query.QueryFactory
-import com.hp.hpl.jena.query.QueryParseException
 import com.hp.hpl.jena.query.Query
+import com.hp.hpl.jena.query.QueryFactory
+import com.mongodb.casbah.commons.MongoDBObject
+import com.mongodb.casbah.commons.conversions.scala.RegisterConversionHelpers
+import com.mongodb.casbah.commons.conversions.scala.RegisterJodaTimeConversionHelpers
+import de.unimannheim.dws.models.mongo.CommonLogFile
+import de.unimannheim.dws.models.mongo.CommonLogFileDAO
+import de.unimannheim.dws.models.mongo.SimpleTripleDAO
 import de.unimannheim.dws.models.mongo.SparqlQuery
 import de.unimannheim.dws.models.mongo.SparqlQueryDAO
+import de.unimannheim.dws.preprocessing.ArqTripleExtractor
+import de.unimannheim.dws.preprocessing.ManualTripleExtractor
 
 // http://notes.3kbo.com/scala
 // http://joernhees.de/blog/2010/10/31/setting-up-a-local-dbpedia-mirror-with-virtuoso/
@@ -59,14 +55,25 @@ object TripleExtractorController extends App {
 
       val sparqlQuery = SparqlQuery(query = queryString, containsErrors = false)
       
-      val seqOfTriples = TripleExtractor.extract(query, sparqlQuery._id)
+      val seqOfTriples = ArqTripleExtractor.extract(query, sparqlQuery._id)
 
       (sparqlQuery, seqOfTriples)
 
     } catch {
       case e: Exception => {
+
+        
+       val sparqlQuery = SparqlQuery(query = queryString)
+       
+       val seqOfTriples = ManualTripleExtractor.extract(queryString)
+       
+       if(seqOfTriples.size == 0) {
+         (sparqlQuery, seqOfTriples)
+       }
+       else {         
 //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-        (SparqlQuery(query = queryString, containsErrors = true), Seq())
+        (sparqlQuery.copy(containsErrors = false), seqOfTriples)
+       }
       }
     }
 

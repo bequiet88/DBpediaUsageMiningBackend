@@ -13,6 +13,6 @@ import com.novus.salat.annotations.raw.Key
 case class SparqlQuery(
     @Key("_id") _id: ObjectId = new ObjectId, 
     query: String, 
-    containsErrors: Boolean)
+    containsErrors: Boolean = true)
     
 object SparqlQueryDAO extends SalatDAO[SparqlQuery, ObjectId](collection = MongoConnection()("usage_mining")("sparql_queries"))    
