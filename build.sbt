@@ -13,7 +13,10 @@ libraryDependencies ++= Seq(
   "org.mongodb" 			%% "casbah" 					 % "2.6.5",
   "com.novus" 				%% "salat" 						 % "1.9.5",
   "org.specs2" 				%% "specs2" 					 % "2.3.8" % "test",
-  "org.apache.jena" 		% "apache-jena-libs" 			 % "2.11.0"
+  "org.apache.jena" 		% "jena-core" 	 % "2.11.0" withSources,
+  "org.apache.jena" 		% "jena-arq" 	 % "2.11.0" withSources,
+  "org.apache.jena" 		% "jena-iri" 	 % "1.0.0" withSources,
+  "org.apache.jena" 		% "jena-tdb" 	 % "1.0.0" withSources
 )
 
 scalacOptions in Test ++= Seq("-Yrangepos")

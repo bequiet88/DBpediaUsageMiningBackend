@@ -21,6 +21,6 @@ case class SimpleTriple(
     obj_type: String,
     obj_pref: String,
     obj_ent: String,
-    queryId: ObjectId)
+    queryId: ObjectId = null)
     
 object SimpleTripleDAO extends SalatDAO[SimpleTriple, ObjectId](collection = MongoConnection()("usage_mining")("simple_triples"))    

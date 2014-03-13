@@ -13,6 +13,7 @@ import de.unimannheim.dws.models.mongo.SparqlQuery
 import de.unimannheim.dws.models.mongo.SparqlQueryDAO
 import de.unimannheim.dws.preprocessing.ArqTripleExtractor
 import de.unimannheim.dws.preprocessing.ManualTripleExtractor
+import com.hp.hpl.jena.query.Syntax
 
 // http://notes.3kbo.com/scala
 // http://joernhees.de/blog/2010/10/31/setting-up-a-local-dbpedia-mirror-with-virtuoso/
@@ -31,7 +32,7 @@ object TripleExtractorController extends App {
 
   val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
     .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-    .toList
+    .limit(5).toList
 
   //  rawCLFs.map(o => println(o.toString))
 
@@ -49,7 +50,7 @@ object TripleExtractorController extends App {
       /*
        * Try to create valid SPARQL query
        */
-      val query: Query = QueryFactory.create(queryString)
+      val query: Query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_10)
 
 //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
 
@@ -68,11 +69,11 @@ object TripleExtractorController extends App {
        val seqOfTriples = ManualTripleExtractor.extract(queryString)
        
        if(seqOfTriples.size == 0) {
-         (sparqlQuery, seqOfTriples)
+         (sparqlQuery, List())
        }
        else {         
 //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-        (sparqlQuery.copy(containsErrors = false), seqOfTriples)
+        (sparqlQuery.copy(containsErrors = false), seqOfTriples.map(triple => triple.copy(queryId = sparqlQuery._id)))
        }
       }
     }
