@@ -160,8 +160,6 @@ object ManualTripleExtractor {
         obj_ent = objInfo._2,
         obj_type = objInfo._3)
     })
-
-    Seq()
   }
 
   /*
@@ -178,20 +176,18 @@ object ManualTripleExtractor {
          */
         if (n.getValue.startsWith("<")) {
           val withouthBrackets = n.getValue.substring(1, n.getValue.length - 1)
-          if(withouthBrackets.count(_ == ':') > 1) {
-            val posLastColon = withouthBrackets.reverse.indexOf(":")            
+          if (withouthBrackets.count(_ == ':') > 1) {
+            val posLastColon = withouthBrackets.reverse.indexOf(":")
             (withouthBrackets.reverse.substring(posLastColon, withouthBrackets.length()).reverse, withouthBrackets.reverse.substring(0, posLastColon).reverse, "uri")
-          }
-          else if (withouthBrackets.contains("#")) {
-            val posAsterix = withouthBrackets.reverse.indexOf("#")            
-            (withouthBrackets.reverse.substring(posAsterix , withouthBrackets.length()).reverse, withouthBrackets.reverse.substring(0, posAsterix).reverse, "uri")
-          }
-          else {
+          } else if (withouthBrackets.contains("#")) {
+            val posAsterix = withouthBrackets.reverse.indexOf("#")
+            (withouthBrackets.reverse.substring(posAsterix, withouthBrackets.length()).reverse, withouthBrackets.reverse.substring(0, posAsterix).reverse, "uri")
+          } else {
             val posLastSlash = withouthBrackets.reverse.indexOf("/")
-            (withouthBrackets.reverse.substring(posLastSlash , withouthBrackets.length()).reverse, withouthBrackets.reverse.substring(0, posLastSlash).reverse, "uri")
+            (withouthBrackets.reverse.substring(posLastSlash, withouthBrackets.length()).reverse, withouthBrackets.reverse.substring(0, posLastSlash).reverse, "uri")
           }
-          
-        /*  
+
+          /*  
          *  Uri does use a Prefix -> look it up in the prefix map
          */
         } else {
@@ -263,6 +259,13 @@ object ManualTripleExtractor {
   def tokenize(query: String): List[SparqlParserElement] = {
 
     val tokens = query.split(" ").toList
+    
+    /* TODO: Tail recursion that checks every element if last character is "."
+     * if true: Add two elements to result -> split current token
+     * if false: only add current element
+     */ 
+   
+    
 
     tokens.map(token => {
       token.charAt(0) match {
@@ -270,15 +273,19 @@ object ManualTripleExtractor {
         case '"' => new Literal(token)
         case '<' => new Uri(token)
         case '.' => new EndOfTriple(token)
-        case ';' => new EndOfTriple(token)
+        case ';' => new Semicolon(token)
         case '}' => new EndOfTriple(token)
         case _ => {
+          if (token.startsWith("FILTER")) new EndOfTriple(token)
           if (token.contains(':')) new Uri(token)
           else new Noise(token)
         }
       }
     })
 
+    
+    
+    
   }
 
   /*
@@ -291,16 +298,10 @@ object ManualTripleExtractor {
       if (elements.isEmpty) res
       else {
         elements match {
+          case List(s: TriplePatternElement, p: TriplePatternElement, o: TriplePatternElement, x: Semicolon, _*) => finder(elements.slice(3, elements.size - 1), res :+ (s, p, o))
           case List(s: TriplePatternElement, p: TriplePatternElement, o: TriplePatternElement, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s, p, o))
-          //          case List(s: Uri, p: Uri, o: Literal, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Uri, p: Uri, o: Variable, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Uri, p: Literal, o: Uri, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Uri, p: Literal, o: Variable, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Uri, p: Variable, o: Uri, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Uri, p: Variable, o: Variable, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Literal, p: Uri, o: Uri, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          //          case List(s: Literal, p: Uri, o: Uri, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (s.getValue, p.getValue, o.getValue))
-          case List(p: TriplePatternElement, o: TriplePatternElement, x: Semicolon, _*) => finder(elements.slice(3, elements.size - 1), res :+ (res.last._1, p, o))
+          case List(y: Semicolon, p: TriplePatternElement, o: TriplePatternElement, x: Semicolon, _*) => finder(elements.slice(3, elements.size - 1), res :+ (res.last._1, p, o))
+          case List(y: Semicolon, p: TriplePatternElement, o: TriplePatternElement, x: EndOfTriple, _*) => finder(elements.slice(4, elements.size - 1), res :+ (res.last._1, p, o))
           case _ => finder(elements.tail, res)
         }
 

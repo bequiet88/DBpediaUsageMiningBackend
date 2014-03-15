@@ -44,7 +44,7 @@ object TripleExtractorController extends App {
       case Some(query) => query
       case _ => ""
     }
-    
+
     try {
 
       /*
@@ -52,10 +52,10 @@ object TripleExtractorController extends App {
        */
       val query: Query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_10)
 
-//      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
+      //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
 
       val sparqlQuery = SparqlQuery(query = queryString, containsErrors = false)
-      
+
       val seqOfTriples = ArqTripleExtractor.extract(query, sparqlQuery._id)
 
       (sparqlQuery, seqOfTriples)
@@ -63,31 +63,28 @@ object TripleExtractorController extends App {
     } catch {
       case e: Exception => {
 
-        
-       val sparqlQuery = SparqlQuery(query = queryString)
-       
-       val seqOfTriples = ManualTripleExtractor.extract(queryString)
-       
-       if(seqOfTriples.size == 0) {
-         (sparqlQuery, List())
-       }
-       else {         
-//        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-        (sparqlQuery.copy(containsErrors = false), seqOfTriples.map(triple => triple.copy(queryId = sparqlQuery._id)))
-       }
+        val sparqlQuery = SparqlQuery(query = queryString)
+
+        val seqOfTriples = ManualTripleExtractor.extract(queryString)
+
+        if (seqOfTriples.size == 0) {
+          (sparqlQuery, List())
+        } else {
+          //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
+          (sparqlQuery.copy(containsErrors = false), seqOfTriples.map(triple => triple.copy(queryId = sparqlQuery._id)))
+        }
       }
     }
 
   }
-  
+
   /*
    * Insert queries and triples into doc store
    */
-  val queries = queriesTriples.map(_._1)  
+  val queries = queriesTriples.map(_._1)
   SparqlQueryDAO.insert(queries)
-  
+
   val triples = queriesTriples.map(_._2).flatten
   SimpleTripleDAO.insert(triples)
-  
-  
+
 }

@@ -49,7 +49,7 @@ object StatisticController extends App {
     //    .skip(1)
     //    .limit(613)
     .toList
-    
+
   writeOutputToFile("", List(("Data Set Size", "", ""), ("" + rawCLFs.size, "", "")))
 
   /*
@@ -65,32 +65,31 @@ object StatisticController extends App {
   } yield format
 
   val formatDistribution = formats.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => (f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / formats.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %")).reverse
+    .toList.sortBy({ _._2 }).map(f => (f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / formats.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
   writeOutputToFile("Distribtion of Content Type of Access Log Entries", formatDistribution.+:(("Content Type", "Abs. Number", "Rel. Number")).slice(0, 11))
 
   /*
    * SPARQL Query-type break down
    */
-  val sparqlQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> false))
-//    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
+  val successQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> false))
+    //    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
     //    .skip(1)
     //    .limit(613)
     .toList
 
-  val successQueries = sparqlQueries.filter(q => q.containsErrors == false)
   val selectQueries = successQueries.filter(q => q.query.contains("SELECT"))
   val describeQueries = successQueries.filter(q => q.query.contains("DESCRIBE")).size
   val askQueries = successQueries.filter(q => q.query.contains("ASK")).size
+  val constructQueries = successQueries.filter(q => q.query.contains("CONSTRUCT")).size
   val errorQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> true)).count
-
 
   val queryBreakDown = List(
     ("Type", "Abs. Number", "Rel. Number"),
-    ("SELECT", "" + selectQueries.size, "" + BigDecimal(selectQueries.size.toFloat / sparqlQueries.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %"),
-    ("DESCRIBE", "" + describeQueries, "" + BigDecimal(describeQueries.toFloat / sparqlQueries.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %"),
-    ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / sparqlQueries.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + "%"),
-    ("error", "" + errorQueries, "" + BigDecimal(errorQueries.toFloat / sparqlQueries.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %"))
+    ("SELECT", "" + selectQueries.size, "" + BigDecimal(selectQueries.size.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+    ("DESCRIBE", "" + describeQueries, "" + BigDecimal(describeQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+    ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP) + "%"),
+    ("error", "" + errorQueries, "" + BigDecimal(errorQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)))
 
   writeOutputToFile("SPARQL query break down", queryBreakDown)
 
@@ -98,11 +97,11 @@ object StatisticController extends App {
    * SELECT queries with N triple pattern
    */
 
- val simpleTriples = //try {
+  val simpleTriples = //try {
     SimpleTripleDAO.find(ref = MongoDBObject()).toList
-//  } catch {
-//    case e: Exception => List()
-//  }
+  //  } catch {
+  //    case e: Exception => List()
+  //  }
 
   val queryTripleOccurrences = for {
     query <- selectQueries
@@ -115,7 +114,7 @@ object StatisticController extends App {
   val noOfTriples = queryTripleOccurrences.map(_._3)
 
   val tripleDistribution = noOfTriples.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / noOfTriples.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %")).reverse
+    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / noOfTriples.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
   writeOutputToFile("SELECT queries with N triple pattern", tripleDistribution.+:(("N", "Abs. Number", "Rel. Number")).slice(0, 11))
 
@@ -129,7 +128,7 @@ object StatisticController extends App {
   } yield "(" + query.sub_type + "," + query.pred_type + "," + query.obj_type + ")"
 
   val patternDistribution = patternTypes.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %")).reverse
+    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
   writeOutputToFile("Main query pattern types", patternDistribution.+:(("Pattern", "Abs. Number", "Rel. Number")).slice(0, 11))
 
@@ -142,7 +141,7 @@ object StatisticController extends App {
   } yield "<" + cleanedquery.pred_pref + cleanedquery.pred_prop + ">"
 
   val predicateDistribution = predicateTypes.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP) + " %")).reverse
+    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
   writeOutputToFile("Predicates used in 1-pattern queries", predicateDistribution.+:(("Predicate", "Abs. Number", "Rel. Number")).slice(0, 11))
 
