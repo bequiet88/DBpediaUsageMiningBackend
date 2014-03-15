@@ -248,7 +248,7 @@ object ManualTripleExtractor {
 
     //    val curlyBracesBlocks = curlyBracesBalancer(actualQuery)
 
-    val elements = tokenize(cleanedActualQuery)
+    val elements = recursiveTokenize(cleanedActualQuery)
 
     recursiveTripleFinder(elements)
   }
@@ -256,36 +256,64 @@ object ManualTripleExtractor {
   /*
    * Tokenizes the query string and allocates the suitable class to the token
    */
-  def tokenize(query: String): List[SparqlParserElement] = {
+  def recursiveTokenize(query: String): List[SparqlParserElement] = {
 
     val tokens = query.split(" ").toList
-    
+
     /* TODO: Tail recursion that checks every element if last character is "."
      * if true: Add two elements to result -> split current token
      * if false: only add current element
-     */ 
-   
-    
+     */
 
-    tokens.map(token => {
-      token.charAt(0) match {
-        case '?' => new Variable(token)
-        case '"' => new Literal(token)
-        case '<' => new Uri(token)
-        case '.' => new EndOfTriple(token)
-        case ';' => new Semicolon(token)
-        case '}' => new EndOfTriple(token)
-        case _ => {
-          if (token.startsWith("FILTER")) new EndOfTriple(token)
-          if (token.contains(':')) new Uri(token)
-          else new Noise(token)
+    def tokenize(tokens: List[String], res: List[SparqlParserElement]): List[SparqlParserElement] = {
+
+      if (tokens.isEmpty) res
+      else {
+        tokens match {
+          case token :: tail => {
+            if (token.charAt(token.length() - 1) == ('.')) {
+              val tokenSub = token.substring(0, token.length() - 1)
+              val firstToken = token.charAt(0) match {
+                case '?' => new Variable(tokenSub)
+                case '"' => new Literal(tokenSub)
+                case '<' => new Uri(tokenSub)
+                case '.' => new EndOfTriple(tokenSub)
+                case ';' => new Semicolon(tokenSub)
+                case '}' => new EndOfTriple(tokenSub)
+                case _ => {
+                  if (token.startsWith("FILTER")) new EndOfTriple(tokenSub)
+                  if (token.contains(':')) new Uri(tokenSub)
+                  else new Noise(tokenSub)
+                }
+              }
+              val secondToken = new EndOfTriple(".")
+              //recursion
+              tokenize(tail, res ++ List(firstToken, secondToken))
+            } else {
+              val firstToken = token.charAt(0) match {
+                case '?' => new Variable(token)
+                case '"' => new Literal(token)
+                case '<' => new Uri(token)
+                case '.' => new EndOfTriple(token)
+                case ';' => new Semicolon(token)
+                case '}' => new EndOfTriple(token)
+                case _ => {
+                  if (token.startsWith("FILTER")) new EndOfTriple(token)
+                  if (token.contains(':')) new Uri(token)
+                  else new Noise(token)
+                }
+              }
+              //recursion
+              tokenize(tail, res:+firstToken)
+            }
+          }
+          case Nil => res
         }
       }
-    })
 
-    
-    
-    
+    }
+    //start recursion
+    tokenize(tokens, List())
   }
 
   /*
