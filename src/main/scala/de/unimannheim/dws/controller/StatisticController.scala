@@ -44,6 +44,7 @@ object StatisticController extends App {
   /*
    * Data Set Size Statistics
    */
+  println("Data Set Statistics");
   val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
     .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
     //    .skip(1)
@@ -51,11 +52,12 @@ object StatisticController extends App {
     .toList
 
   writeOutputToFile("", List(("Data Set Size", "", ""), ("" + rawCLFs.size, "", "")))
-
+  
   /*
    * Content Type Statistics
    * http://wiki.opensemanticframework.org/index.php/SPARQL#Content_Returned
    */
+  println("Content Type Statistics");
   val formats = for {
     log <- rawCLFs
     format = log.request.get("format") match {
@@ -72,6 +74,7 @@ object StatisticController extends App {
   /*
    * SPARQL Query-type break down
    */
+  println("SPARQL Query-type break down");
   val successQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> false))
     //    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
     //    .skip(1)
@@ -88,7 +91,8 @@ object StatisticController extends App {
     ("Type", "Abs. Number", "Rel. Number"),
     ("SELECT", "" + selectQueries.size, "" + BigDecimal(selectQueries.size.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
     ("DESCRIBE", "" + describeQueries, "" + BigDecimal(describeQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
-    ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP) + "%"),
+    ("CONSTRUCT", "" + constructQueries, "" + BigDecimal(constructQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+    ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
     ("error", "" + errorQueries, "" + BigDecimal(errorQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)))
 
   writeOutputToFile("SPARQL query break down", queryBreakDown)
@@ -96,7 +100,7 @@ object StatisticController extends App {
   /*
    * SELECT queries with N triple pattern
    */
-
+  println("SELECT queries with N triple pattern");
   val simpleTriples = //try {
     SimpleTripleDAO.find(ref = MongoDBObject()).toList
   //  } catch {
@@ -104,12 +108,17 @@ object StatisticController extends App {
   //  }
 
   val queryTripleOccurrences = for {
-    query <- selectQueries
+    // zipwithIndex returns no of current iteration
+    (query, index) <- selectQueries.zipWithIndex
     triples = {
       simpleTriples.filter(_.queryId == query._id)
     }
     n = triples.size
-  } yield (query, triples, n)
+    printer = println(index)
+  } yield {
+   
+    (query, triples, n)
+  }
 
   val noOfTriples = queryTripleOccurrences.map(_._3)
 
@@ -121,6 +130,7 @@ object StatisticController extends App {
   /*
    * Main Query-pattern types (1-pattern queries only)
    */
+  println("Main Query-pattern types (1-pattern queries only)");
   val onePatternTriples = queryTripleOccurrences.filter(q => q._3 == 1).map(q => q._2)
 
   val patternTypes = for {
@@ -135,6 +145,7 @@ object StatisticController extends App {
   /*
    * Predicates used in 1-pattern queries
    */
+  println("Predicates used in 1-pattern queries");
   val predicateTypes = for {
     query <- onePatternTriples.flatten
     cleanedquery = query if query.pred_type != "var" && query.pred_type != "blank" && query.pred_type != "-"
@@ -176,7 +187,7 @@ object StatisticController extends App {
     }
     csvPrinter.println
     csvPrinter.flush
-
+    println("Wrote to file.");    
   }
 
   //		// generate CSVPrinter Object

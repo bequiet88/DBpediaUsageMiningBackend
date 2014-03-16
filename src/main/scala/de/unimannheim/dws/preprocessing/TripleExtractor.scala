@@ -120,51 +120,48 @@ object ManualTripleExtractor {
    */
   def extract(queryString: String): Seq[SimpleTriple] = {
     /*
-         * Generate the map holding all prefix - URL pairs
-         */
-    implicit val prefixMap: Map[String, String] = queryString.length() match {
-      case 0 => Map()
-      case _ => try {
-        generatePrefixMap(queryString.split("SELECT")(0))
-      } catch {
-        case aioob: ArrayIndexOutOfBoundsException => Map()
+     * Generate the map holding all prefix - URL pairs
+     */
+    try {
+      implicit val prefixMap: Map[String, String] = queryString.length() match {
+        case 0 => Map()
+        case _ => generatePrefixMap(queryString.split("SELECT")(0))
       }
-    }
 
-    /*
+      /*
      * Generate a list of all triples in the query
      */
-    val filteredTriples: Seq[(TriplePatternElement, TriplePatternElement, TriplePatternElement)] = queryString.length() match {
-      case 0 => Seq()
-      case _ => try {
-        findAllTriples(queryString.split("SELECT")(1))
-      } catch {
-        case aioob: ArrayIndexOutOfBoundsException => List()
+      val filteredTriples: Seq[(TriplePatternElement, TriplePatternElement, TriplePatternElement)] = queryString.length() match {
+        case 0 => Seq()
+        case _ => findAllTriples(queryString.split("SELECT")(1))
       }
+
+      filteredTriples.map(triple => {
+
+        val subjInfo = getManualNodeInfo(triple._1)
+        val predInfo = getManualNodeInfo(triple._2)
+        val objInfo = getManualNodeInfo(triple._3)
+
+        SimpleTriple(
+          sub_pref = subjInfo._1,
+          sub_ent = subjInfo._2,
+          sub_type = subjInfo._3,
+          pred_pref = predInfo._1,
+          pred_prop = predInfo._2,
+          pred_type = predInfo._3,
+          obj_pref = objInfo._1,
+          obj_ent = objInfo._2,
+          obj_type = objInfo._3)
+      })
+    } catch {
+      case e: Exception => List()
     }
-
-    filteredTriples.map(triple => {
-
-      val subjInfo = getManualNodeInfo(triple._1)
-      val predInfo = getManualNodeInfo(triple._2)
-      val objInfo = getManualNodeInfo(triple._3)
-
-      SimpleTriple(
-        sub_pref = subjInfo._1,
-        sub_ent = subjInfo._2,
-        sub_type = subjInfo._3,
-        pred_pref = predInfo._1,
-        pred_prop = predInfo._2,
-        pred_type = predInfo._3,
-        obj_pref = objInfo._1,
-        obj_ent = objInfo._2,
-        obj_type = objInfo._3)
-    })
   }
 
   /*
    *   Method to generate information from a TriplePatternElement
    */
+  @throws(classOf[Exception])
   def getManualNodeInfo(node: TriplePatternElement)(implicit prefixMap: Map[String, String]): (String, String, String) = {
 
     node match {
@@ -175,6 +172,7 @@ object ManualTripleExtractor {
          * Uri does not uses a shortage for the resolutino URI
          */
         if (n.getValue.startsWith("<")) {
+//          println(n.getValue);
           val withouthBrackets = n.getValue.substring(1, n.getValue.length - 1)
           if (withouthBrackets.count(_ == ':') > 1) {
             val posLastColon = withouthBrackets.reverse.indexOf(":")
@@ -191,12 +189,8 @@ object ManualTripleExtractor {
          *  Uri does use a Prefix -> look it up in the prefix map
          */
         } else {
-          try {
-            val nodeElements = n.getValue.split(":", 2)
-            (prefixMap.get(nodeElements(0)).get, nodeElements(1), "uri")
-          } catch {
-            case aioob: ArrayIndexOutOfBoundsException => ("", "", "")
-          }
+          val nodeElements = n.getValue.split(":", 2)
+          (prefixMap.get(nodeElements(0)).get, nodeElements(1), "uri")
         }
       }
       case _ => ("", "", "")
@@ -206,6 +200,7 @@ object ManualTripleExtractor {
   /*
    * Extracts all Prefixes and their resolver to a map
    */
+  @throws(classOf[Exception])
   def generatePrefixMap(prefixes: String): Map[String, String] = {
 
     // Sample Prefix: PREFIX owl: <http://www.w3.org/2002/07/owl#>\n
@@ -228,6 +223,7 @@ object ManualTripleExtractor {
   /*
    * Finds patterns of triples in the query
    */
+  @throws(classOf[Exception])
   def findAllTriples(actualQuery: String): Seq[(TriplePatternElement, TriplePatternElement, TriplePatternElement)] = {
 
     /*
@@ -256,6 +252,7 @@ object ManualTripleExtractor {
   /*
    * Tokenizes the query string and allocates the suitable class to the token
    */
+  @throws(classOf[Exception])
   def recursiveTokenize(query: String): List[SparqlParserElement] = {
 
     val tokens = query.split(" ").toList
@@ -264,7 +261,7 @@ object ManualTripleExtractor {
      * if true: Add two elements to result -> split current token
      * if false: only add current element
      */
-
+    @throws(classOf[Exception])
     def tokenize(tokens: List[String], res: List[SparqlParserElement]): List[SparqlParserElement] = {
 
       if (tokens.isEmpty) res
@@ -304,7 +301,7 @@ object ManualTripleExtractor {
                 }
               }
               //recursion
-              tokenize(tail, res:+firstToken)
+              tokenize(tail, res :+ firstToken)
             }
           }
           case Nil => res
@@ -319,6 +316,7 @@ object ManualTripleExtractor {
   /*
    * Recursively traverses the list to find the patterns of elements that are needed for a triple
    */
+  @throws(classOf[Exception])
   def recursiveTripleFinder(elements: List[SparqlParserElement]): List[(TriplePatternElement, TriplePatternElement, TriplePatternElement)] = {
 
     def finder(elements: List[SparqlParserElement], res: List[(TriplePatternElement, TriplePatternElement, TriplePatternElement)]): List[(TriplePatternElement, TriplePatternElement, TriplePatternElement)] = {
@@ -357,6 +355,10 @@ object ManualTripleExtractor {
   //    isBalanced(actualQuery.toList, List(), List(), 0)
   //  }
 
+  /*
+   * Simple check whether query is balanced in terms of curly braces
+   */
+  @throws(classOf[Exception])
   def balanced(chars: List[Char]): Boolean = {
 
     def isBalanced(text: List[Char], stack: List[Char]): Boolean =

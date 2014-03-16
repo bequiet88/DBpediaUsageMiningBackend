@@ -32,7 +32,8 @@ object TripleExtractorController extends App {
 
   val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
     .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-    .limit(5).toList
+//    .limit(5)
+    .toList
 
   //  rawCLFs.map(o => println(o.toString))
 
