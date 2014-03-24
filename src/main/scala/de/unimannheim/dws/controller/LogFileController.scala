@@ -23,7 +23,7 @@ object LogFileController extends App {
   RegisterConversionHelpers()
   RegisterJodaTimeConversionHelpers()
 
-  val filesHere = (new java.io.File("G:/usewod2014-dataset/DBpedia/dbp39/test/")).listFiles
+  val filesHere = (new java.io.File("D:/Download/Uni_Projekte/Master_Thesis/usewod2014-dataset/USEWOD2014/data/DBpedia/dbpedia3.9/http19122013.log/")).listFiles//(new java.io.File("G:/usewod2014-dataset/DBpedia/dbp39/test/")).listFiles
 
   //val path = "D:/Download/Uni_Projekte/Master_Thesis/usewod2014-dataset/USEWOD2014/data/DBpedia/dbpedia3.9/http19122013.log/http19122013.log"
 

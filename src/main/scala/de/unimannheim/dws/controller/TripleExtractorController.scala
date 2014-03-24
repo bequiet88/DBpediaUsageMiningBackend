@@ -51,7 +51,7 @@ object TripleExtractorController extends App {
       /*
        * Try to create valid SPARQL query
        */
-      val query: Query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_10)
+      val query: Query = QueryFactory.create(queryString)
 
       //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
 
