@@ -1,24 +1,27 @@
 package de.unimannheim.dws.models.postgre
 
 import java.sql.Timestamp
-
 import scala.slick.driver.PostgresDriver.simple._
+import de.unimannheim.dws.models.postgre.Tables.UserSessionsRow
 
-case class UserSession(
-  id: Long,
-  ip: String,
-  timeFrom: Timestamp,
-  timeTo: Timestamp,
-  createdAt: Timestamp) {
-  def setId(id: Long) = this.copy(id = id)
-}
+object UserSessionTest extends App {
+  dbConn.openConn withSession { implicit session =>
+    val userTable = Tables.UserSessions
+    
+    
+//    println(userTable.findBy("id" => 4));
+    
+    userTable foreach(r => println(r))
 
+    
 
-class UserSessions(tag: Tag) extends Table[UserSession](tag, "user_sessions") {
-  def id  = column[Long]("id")
-  def ip = column[String]("ip")
-  def timeFrom = column[Timestamp]("time_from")
-  def timeTo = column[Timestamp]("time_to")
-  def createdAt = column[Timestamp]("created_at")
-  def * = (id, ip, timeFrom, timeTo, createdAt) <> (UserSession.tupled, UserSession.unapply _)
+    val newUser = UserSessionsRow(id = 0L, ip = Some("2de7e8ad72e76d7534a905868d58de29"), timeFrom = None, timeTo = None, createdAt = None)
+
+    // Slick insert
+    val newId = (userTable returning userTable.map(_.id)) += newUser
+
+    println(newId)
+  }
+  // TODO create with autotimestamp -> Joda to SQL
+
 }

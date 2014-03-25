@@ -10,10 +10,10 @@ test.charAt(test.length()-1)                      //> res0: Char = L
 test.count(_ == ':')                              //> res1: Int = 1
 val testIndex = test.indexOf(":")                 //> testIndex  : Int = 7
 val testSubString = test.substring(0,test.length()-1)
-                                                  //> testSubString  : String = 1kfjsdf:lkfdslfk-
+                                                  //> testSubString  : String = 1kfjsdf:lkfdslfk/
 
 scala.slick.model.codegen.SourceCodeGenerator.main(
-  Array("scala.slick.driver.PostgresDriver", "org.postgresql.Driver", "jdbc:postgresql://localhost/usage_mining", "D:/data_server/eclipse/DBpediaUsageMining/src/main/scala/de/unimannheim/dws/models/postgre", "de.unimannheim.dws.models.postgre", "postgres", "postgres")
+  Array("scala.slick.driver.PostgresDriver", "org.postgresql.Driver", "jdbc:postgresql://localhost/usage_mining", "D:/data_server/eclipse/DBpediaUsageMining/src/main/scala/", "de.unimannheim.dws.models.postgre", "postgres", "postgres")
 )
 
 }
