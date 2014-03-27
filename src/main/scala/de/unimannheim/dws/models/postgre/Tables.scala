@@ -215,7 +215,7 @@ trait Tables {
    *  @param timeTo Database column time_to
    *  @param createdAt Database column created_at
    */
-  case class UserSessionsRow(id: Long, ip: Option[String], timeFrom: Option[java.sql.Timestamp], timeTo: Option[java.sql.Timestamp], createdAt: Option[java.sql.Timestamp] = Some(new Timestamp(System.currentTimeMillis()/1000)))
+  case class UserSessionsRow(id: Long, ip: Option[String], timeFrom: Option[java.sql.Timestamp], timeTo: Option[java.sql.Timestamp], createdAt: Option[java.sql.Timestamp] = Some(new Timestamp(System.currentTimeMillis())))
   /** GetResult implicit for fetching UserSessionsRow objects using plain SQL queries */
   implicit def GetResultUserSessionsRow(implicit e0: GR[Long], e1: GR[Option[String]], e2: GR[Option[java.sql.Timestamp]], e3: GR[Option[java.sql.Timestamp]]): GR[UserSessionsRow] = GR {
     prs =>

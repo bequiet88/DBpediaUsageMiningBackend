@@ -15,7 +15,7 @@ object UserSessionTest extends App {
 
     
 
-    val newUser = UserSessionsRow(id = 0L, ip = Some("2de7e8ad72e76d7534a905868d58de29"), timeFrom = None, timeTo = None, createdAt = None)
+    val newUser = UserSessionsRow(id = 0L, ip = Some("2de7e8ad72e76d7534a905868d58de29"), timeFrom = None, timeTo = None)
 
     // Slick insert
     val newId = (userTable returning userTable.map(_.id)) += newUser
