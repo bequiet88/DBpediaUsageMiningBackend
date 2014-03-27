@@ -4,7 +4,7 @@ import java.sql.Timestamp
 import scala.slick.driver.PostgresDriver.simple._
 import de.unimannheim.dws.models.postgre.Tables.UserSessionsRow
 
-object dbConn {
+object DbConn {
 
   import scala.slick.driver.PostgresDriver.simple.{ Database, Session }
   val ds = new org.postgresql.ds.PGSimpleDataSource
@@ -19,7 +19,7 @@ object dbConn {
 }
 
 object UserSessionTest extends App {
-  dbConn.openConn withSession { implicit session =>
+  DbConn.openConn withSession { implicit session =>
     val userTable = Tables.UserSessions
 
     //    println(userTable.findBy("id" => 4));

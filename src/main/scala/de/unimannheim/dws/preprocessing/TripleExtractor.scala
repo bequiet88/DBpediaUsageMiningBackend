@@ -16,6 +16,7 @@ import com.hp.hpl.jena.sparql.syntax.ElementUnion
 import de.unimannheim.dws.models.mongo.SimpleTriple
 import com.hp.hpl.jena.graph.Node
 import org.bson.types.ObjectId
+import de.unimannheim.dws.models.postgre.Tables._
 
 // http://jena.apache.org/documentation/javadoc/jena/index.html
 // http://jena.apache.org/documentation/javadoc/arq/index.html
@@ -30,7 +31,7 @@ object ArqTripleExtractor {
   /*
    * Main method for ARQ extraction
    */
-  def extract(query: Query, id: ObjectId): Seq[SimpleTriple] = {
+  def extract(query: Query, queryId: Long): Seq[SimpleTriplesRow] = {
 
     val elems: List[Element] = query.getQueryPattern() match {
       case x: ElementGroup => x.getElements().asScala.toList
@@ -59,17 +60,18 @@ object ArqTripleExtractor {
 
       println(objInfo)
 
-      SimpleTriple(
-        sub_pref = subjInfo._1,
-        sub_ent = subjInfo._2,
-        sub_type = subjInfo._3,
-        pred_pref = predInfo._1,
-        pred_prop = predInfo._2,
-        pred_type = predInfo._3,
-        obj_pref = objInfo._1,
-        obj_ent = objInfo._2,
-        obj_type = objInfo._3,
-        queryId = id)
+      SimpleTriplesRow(
+        id = 0L,
+        subjPrefix = Some(subjInfo._1),
+        subjEntity = Some(subjInfo._2),
+        subjType = Some(subjInfo._3),
+        predPrefix = Some(predInfo._1),
+        predProp = Some(predInfo._2),
+        predType = Some(predInfo._3),
+        objPrefix = Some(objInfo._1),
+        objEntity = Some(objInfo._2),
+        objType = Some(objInfo._3),
+        queryId = Some(queryId))
     })
 
   }
@@ -118,7 +120,7 @@ object ManualTripleExtractor {
   /*
    * Main method for Manual extraction
    */
-  def extract(queryString: String): Seq[SimpleTriple] = {
+  def extract(queryString: String): Seq[SimpleTriplesRow] = {
     /*
      * Generate the map holding all prefix - URL pairs
      */
@@ -142,16 +144,18 @@ object ManualTripleExtractor {
         val predInfo = getManualNodeInfo(triple._2)
         val objInfo = getManualNodeInfo(triple._3)
 
-        SimpleTriple(
-          sub_pref = subjInfo._1,
-          sub_ent = subjInfo._2,
-          sub_type = subjInfo._3,
-          pred_pref = predInfo._1,
-          pred_prop = predInfo._2,
-          pred_type = predInfo._3,
-          obj_pref = objInfo._1,
-          obj_ent = objInfo._2,
-          obj_type = objInfo._3)
+      SimpleTriplesRow(
+        id = 0L,
+        subjPrefix = Some(subjInfo._1),
+        subjEntity = Some(subjInfo._2),
+        subjType = Some(subjInfo._3),
+        predPrefix = Some(predInfo._1),
+        predProp = Some(predInfo._2),
+        predType = Some(predInfo._3),
+        objPrefix = Some(objInfo._1),
+        objEntity = Some(objInfo._2),
+        objType = Some(objInfo._3),
+        queryId = None)
       })
     } catch {
       case e: Exception => List()

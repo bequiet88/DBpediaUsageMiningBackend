@@ -11,9 +11,13 @@ import de.unimannheim.dws.models.mongo.CommonLogFileDAO
 import de.unimannheim.dws.models.mongo.SimpleTripleDAO
 import de.unimannheim.dws.models.mongo.SparqlQuery
 import de.unimannheim.dws.models.mongo.SparqlQueryDAO
+import de.unimannheim.dws.models.postgre.Tables._
+import de.unimannheim.dws.models.postgre.DbConn
 import de.unimannheim.dws.preprocessing.ArqTripleExtractor
 import de.unimannheim.dws.preprocessing.ManualTripleExtractor
 import com.hp.hpl.jena.query.Syntax
+import scala.slick.driver.PostgresDriver.simple._
+import de.unimannheim.dws.models.postgre.DbConn
 
 // http://notes.3kbo.com/scala
 // http://joernhees.de/blog/2010/10/31/setting-up-a-local-dbpedia-mirror-with-virtuoso/
@@ -32,7 +36,7 @@ object TripleExtractorController extends App {
 
   val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
     .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-//    .limit(5)
+    //    .limit(5)
     .toList
 
   //  rawCLFs.map(o => println(o.toString))
@@ -48,31 +52,45 @@ object TripleExtractorController extends App {
 
     try {
 
-      /*
+      DbConn.openConn withSession { implicit session =>
+
+        /*
        * Try to create valid SPARQL query
        */
-      val query: Query = QueryFactory.create(queryString)
+        val query: Query = QueryFactory.create(queryString)
 
-      //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
+        //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
 
-      val sparqlQuery = SparqlQuery(query = queryString, containsErrors = false)
+        val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
 
-      val seqOfTriples = ArqTripleExtractor.extract(query, sparqlQuery._id)
+        val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
 
-      (sparqlQuery, seqOfTriples)
+        val seqOfTriples = ArqTripleExtractor.extract(query, newId)
 
+        seqOfTriples
+      }
     } catch {
       case e: Exception => {
+        DbConn.openConn withSession { implicit session =>
 
-        val sparqlQuery = SparqlQuery(query = queryString)
+          val seqOfTriples = ManualTripleExtractor.extract(queryString)
 
-        val seqOfTriples = ManualTripleExtractor.extract(queryString)
-
-        if (seqOfTriples.size == 0) {
-          (sparqlQuery, List())
-        } else {
-          //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-          (sparqlQuery.copy(containsErrors = false), seqOfTriples.map(triple => triple.copy(queryId = sparqlQuery._id)))
+          /*
+           * If query contains errors, the seqOfTriples is empty
+           */
+          if (seqOfTriples.size == 0) {
+            val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("true"), sessionId = None)
+            val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
+            List()
+          } else {
+            /*
+           * If not, insert manually parsed triples
+           */
+            val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
+            val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
+            //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
+            seqOfTriples.map(triple => triple.copy(queryId = Some(newId)))
+          }
         }
       }
     }
@@ -80,12 +98,12 @@ object TripleExtractorController extends App {
   }
 
   /*
-   * Insert queries and triples into doc store
+   * Insert batch of triples into persistent store
    */
-  val queries = queriesTriples.map(_._1)
-  SparqlQueryDAO.insert(queries)
-
-  val triples = queriesTriples.map(_._2).flatten
-  SimpleTripleDAO.insert(triples)
+  val triples = queriesTriples.flatten
+  DbConn.openConn withSession { implicit session =>
+    SimpleTriples.insertAll(triples: _*)
+  }
+  //  SimpleTripleDAO.insert(triples)
 
 }
