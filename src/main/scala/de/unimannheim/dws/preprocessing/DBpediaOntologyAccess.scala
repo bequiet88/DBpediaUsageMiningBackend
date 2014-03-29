@@ -28,4 +28,18 @@ object DBpediaOntologyAccess {
     superClass <- artefact.listSuperClasses().toList.asScala.toList
     printer = println(superClass.toString())
   } yield {superClass}
+  
+  
+      // 
+    //    val ontClass = DBpediaOntologyAccess.getOntClass("http://dbpedia.org/ontology/Biomolecule")
+    //
+    //    if (ontClass.hasSubClass()) {
+    //
+    //      for {
+    //        subClass <- ontClass.listSubClasses().toList.asScala.toList
+    //        printer = println(subClass.toString())
+    //      } yield { subClass }
+    //
+    //    }
+  
 }

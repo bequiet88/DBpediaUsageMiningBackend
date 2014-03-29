@@ -58,7 +58,7 @@ object ArqTripleExtractor {
       val predInfo = getArqNodeInfo(pred)
       val objInfo = getArqNodeInfo(obj)
 
-      println(objInfo)
+//      println(objInfo)
 
       SimpleTriplesRow(
         id = 0L,
@@ -173,7 +173,7 @@ object ManualTripleExtractor {
       case n: Literal => ("-", n.getValue, "literal")
       case n: Uri => {
         /*
-         * Uri does not uses a shortage for the resolutino URI
+         * Uri does not uses a shortage for the resolution URI
          */
         if (n.getValue.startsWith("<")) {
 //          println(n.getValue);

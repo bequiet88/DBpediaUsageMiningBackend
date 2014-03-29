@@ -34,76 +34,83 @@ object TripleExtractorController extends App {
   RegisterConversionHelpers()
   RegisterJodaTimeConversionHelpers()
 
-  val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
-    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-    //    .limit(5)
-    .toList
+  for {
+    i <- (0 to 310)
 
-  //  rawCLFs.map(o => println(o.toString))
+  } yield {
 
-  val queriesTriples = for (log <- rawCLFs) yield {
-    /*
+     val skip = i * 1000
+     val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
+      .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
+      .limit(1000)
+      .skip(skip)
+      .toList
+    
+    val queriesTriples = for (log <- rawCLFs) yield {
+      /*
      * Get the query string from the log entry
      */
-    val queryString = log.request.get("query") match {
-      case Some(query) => query
-      case _ => ""
-    }
-
-    try {
-
-      DbConn.openConn withSession { implicit session =>
-
-        /*
-       * Try to create valid SPARQL query
-       */
-        val query: Query = QueryFactory.create(queryString)
-
-        //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
-
-        val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
-
-        val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
-
-        val seqOfTriples = ArqTripleExtractor.extract(query, newId)
-
-        seqOfTriples
+      val queryString = log.request.get("query") match {
+        case Some(query) => query
+        case _ => ""
       }
-    } catch {
-      case e: Exception => {
+
+      try {
+
         DbConn.openConn withSession { implicit session =>
 
-          val seqOfTriples = ManualTripleExtractor.extract(queryString)
-
           /*
+       * Try to create valid SPARQL query
+       */
+          val query: Query = QueryFactory.create(queryString)
+
+          //      val id = SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = false))
+
+          val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
+
+          val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
+
+          val seqOfTriples = ArqTripleExtractor.extract(query, newId)
+
+          seqOfTriples
+        }
+      } catch {
+        case e: Exception => {
+          DbConn.openConn withSession { implicit session =>
+
+            val seqOfTriples = ManualTripleExtractor.extract(queryString)
+
+            /*
            * If query contains errors, the seqOfTriples is empty
            */
-          if (seqOfTriples.size == 0) {
-            val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("true"), sessionId = None)
-            val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
-            List()
-          } else {
-            /*
+            if (seqOfTriples.size == 0) {
+              val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("true"), sessionId = None)
+              val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
+              List()
+            } else {
+              /*
            * If not, insert manually parsed triples
            */
-            val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
-            val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
-            //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
-            seqOfTriples.map(triple => triple.copy(queryId = Some(newId)))
+              val sparqlQuery = SparqlQueriesRow(id = 0L, query = Some(queryString), containsErrors = Some("false"), sessionId = None)
+              val newId = (SparqlQueries returning SparqlQueries.map(_.id)) += sparqlQuery
+              //        SparqlQueryDAO.insert(SparqlQuery(query = queryString, containsErrors = true))
+              seqOfTriples.map(triple => triple.copy(queryId = Some(newId)))
+            }
           }
         }
       }
+
     }
 
-  }
-
-  /*
+    /*
    * Insert batch of triples into persistent store
    */
-  val triples = queriesTriples.flatten
-  DbConn.openConn withSession { implicit session =>
-    SimpleTriples.insertAll(triples: _*)
+    val triples = queriesTriples.flatten
+    DbConn.openConn withSession { implicit session =>
+      SimpleTriples.insertAll(triples: _*)
+    }
+    
+    println("inserted "+skip+" queries, this batch had "+ triples.size +" triples.")
+    //  SimpleTripleDAO.insert(triples)
   }
-  //  SimpleTripleDAO.insert(triples)
-
 }
