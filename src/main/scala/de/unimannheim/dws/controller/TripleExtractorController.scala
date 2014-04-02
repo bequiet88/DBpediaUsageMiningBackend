@@ -1,23 +1,21 @@
 package de.unimannheim.dws.controller
 
-import org.bson.types.ObjectId
+import scala.slick.driver.PostgresDriver.simple.queryToInsertInvoker
+
 import com.hp.hpl.jena.query.Query
 import com.hp.hpl.jena.query.QueryFactory
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.commons.conversions.scala.RegisterConversionHelpers
 import com.mongodb.casbah.commons.conversions.scala.RegisterJodaTimeConversionHelpers
-import de.unimannheim.dws.models.mongo.CommonLogFile
+
 import de.unimannheim.dws.models.mongo.CommonLogFileDAO
-import de.unimannheim.dws.models.mongo.SimpleTripleDAO
-import de.unimannheim.dws.models.mongo.SparqlQuery
-import de.unimannheim.dws.models.mongo.SparqlQueryDAO
-import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.models.postgre.DbConn
+import de.unimannheim.dws.models.postgre.Tables.SimpleTriples
+import de.unimannheim.dws.models.postgre.Tables.SparqlQueries
+import de.unimannheim.dws.models.postgre.Tables.SparqlQueriesRow
+import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.ArqTripleExtractor
 import de.unimannheim.dws.preprocessing.ManualTripleExtractor
-import com.hp.hpl.jena.query.Syntax
-import scala.slick.driver.PostgresDriver.simple._
-import de.unimannheim.dws.models.postgre.DbConn
 
 // http://notes.3kbo.com/scala
 // http://joernhees.de/blog/2010/10/31/setting-up-a-local-dbpedia-mirror-with-virtuoso/
