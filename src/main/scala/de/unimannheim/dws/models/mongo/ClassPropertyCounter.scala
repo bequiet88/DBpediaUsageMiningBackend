@@ -11,8 +11,8 @@ import com.novus.salat.annotations.raw.Key
 // https://github.com/novus/salat/wiki/SalatDAO
 
 case class ClassPropertyCounter(
-    @Key("classId") classId: String, 
-    @Key("propertyId") propertyId: String,  
+    @Key("classId") classLabel: String, 
+    @Key("propertyId") propertyLabel: String,  
     count: Integer)
     
 object ClassPropertyCounterDAO extends SalatDAO[ClassPropertyCounter, ObjectId](collection = MongoConnection()("usage_mining")("class_property_counter"))    
