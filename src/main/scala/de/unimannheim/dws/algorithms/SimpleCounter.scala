@@ -7,6 +7,7 @@ import de.unimannheim.dws.preprocessing.Util
 import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
 import scala.collection.JavaConverters._
 import com.hp.hpl.jena.ontology.OntClass
+import scala.util.control._
 
 object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
@@ -17,18 +18,70 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
    */
   def generate()(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
-    val mapClassProp = (for {
-      e <- EntityAnalytics
-      p <- PropertyAnalytics if e.queryId === p.queryId
-    } yield (e.classId.get, p.propertyId.get)).foldLeft(Map[(String, String), Int]())((i, row) => {
+    val loop = new Breaks
+    val limit = 1000000
+    var offset = 0
+    var mapClassProp: Map[(String, String), Int] = Map()
 
-      if (i.contains((row._1, row._2))) {
-        i + (((row._1, row._2), i(row._1, row._2) + 1))
-      } else {
-        i + (((row._1, row._2), 1))
-      }
+    loop.breakable {
+      do {
 
-    })
+        val queryClassProp = (EntityAnalytics flatMap { e =>
+          PropertyAnalytics filter (p => e.tripleId === p.tripleId) map { p =>
+            (e.classId, p.propertyId)
+          }
+        }).sortBy(r => r._1).drop(offset).take(limit)
+
+        //        val queryClassProp = (for {
+        ////          (e, p) <- EntityAnalytics innerJoin PropertyAnalytics on (_.queryId === _.queryId)
+        //          e <- EntityAnalytics
+        //          p <- PropertyAnalytics if e.queryId === p.queryId
+        //        } yield (e.classId, p.propertyId)).sortBy(r => r._1).drop(offset).take(limit)
+
+        println(queryClassProp.selectStatement)
+
+        val listClassProp = queryClassProp.list
+
+        if (listClassProp.size > 0) {
+
+          mapClassProp = listClassProp.foldLeft(mapClassProp)((i, row) => {
+            if (i.size % 1000 == 0) {
+              println("Size of Map: " + i.size)
+            }
+
+            if (i.contains((row._1.get, row._2.get))) {
+              i + (((row._1.get, row._2.get), i(row._1.get, row._2.get) + 1))
+            } else {
+              i + (((row._1.get, row._2.get), 1))
+            }
+          })
+
+        } else {
+          loop.break
+        }
+        offset = offset + limit
+        println("Processed lines from DB: " + offset)
+      } while (true)
+    }
+
+    //    val mapClassProp = (for {
+    //      e <- EntityAnalytics
+    //      p <- PropertyAnalytics if e.queryId === p.queryId
+    //    } yield (e.classId.get, p.propertyId.get))
+
+    //    foldLeft(Map[(String, String), Int]())((i, row) => {
+    //
+    //      if(i.size % 1000 == 0) {
+    //        println("Size of Map: " + i.size)
+    //      }
+    //      
+    //      if (i.contains((row._1, row._2))) {
+    //        i + (((row._1, row._2), i(row._1, row._2) + 1))
+    //      } else {
+    //        i + (((row._1, row._2), 1))
+    //      }
+    //
+    //    })
 
     //      
     //      EntityAnalytics.list.map(ent => {
@@ -47,8 +100,8 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
     //      
     //    println("Lines read from DB: "+listClassProp.size)  
     //
-    //    val resMap = listClassProp.groupBy(l => l).map(t => (t._1, t._2.length))
-    //    
+    //        val resMap = listClassProp.groupBy(l => l).map(t => (t._1, t._2.length))
+
     println("Class Property Pairs extracted from DB: " + mapClassProp.size)
 
     val resList = mapClassProp.map(res => {
@@ -105,10 +158,13 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
         }
       })
 
+      /*
+       * In case all elements are full, return a sorted list, otherwise go into the recursion
+       */
       if (resMapPropIds._2.size > 0) {
-        recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D)
-      } else resMapPropIds._1
-    } else Map()
+        recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
+      } else resMapPropIds._1.toList.sortBy({ _._2 }).reverse
+    } else List()
   }
 
   private def recursiveRetrieval(propertyIds: List[String], classLabel: (String, Option[String]), resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
@@ -138,7 +194,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       }
     })
 
-    val resMapPropIds = leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
+    val resMapPropIds: (Map[String, Double], List[String]) = leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
 
       if (i._2.size > 0) {
         /*
@@ -168,7 +224,10 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
     if (resMapPropIds._2.size > 0 && superClass.hasSuperClass()) {
       recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getLabel("EN")), Some(superClass.getLabel("EN"))), resMapPropIds._1, weight / 2)
-    } else resMapPropIds._1
+    } else {
+      val remainingPropIds = resMapPropIds._2.map(p => (p, 0D)).toMap
+      resMapPropIds._1.++(remainingPropIds)
+    }
   }
 
 }
