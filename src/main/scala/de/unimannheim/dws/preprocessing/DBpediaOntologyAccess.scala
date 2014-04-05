@@ -21,25 +21,30 @@ object DBpediaOntologyAccess {
   def getOntClass(classLabel: String): OntClass = {
     dbpediaModel.getOntClass(classLabel)
   }
+//  
+//  private lazy val artefact: OntClass = dbpediaModel.getOntClass("http://dbpedia.org/ontology/Enzyme")
+//  
+//  println(artefact.getSuperClass().getURI())
+//  
+//  
+//  private lazy val superClasses = for {
+//    superClass <- artefact.listSuperClasses(true).toList.asScala.toList
+//    printer = println(superClass.toString())
+//  } yield {superClass}
+//  
+//  println(superClasses.size)
+//  
   
-  private lazy val artefact: OntClass = dbpediaModel.getOntClass("http://dbpedia.org/ontology/Enzyme")
-  
-  private lazy val superClasses = for {
-    superClass <- artefact.listSuperClasses().toList.asScala.toList
-    printer = println(superClass.toString())
-  } yield {superClass}
-  
-  
-      // 
-    //    val ontClass = DBpediaOntologyAccess.getOntClass("http://dbpedia.org/ontology/Biomolecule")
-    //
-    //    if (ontClass.hasSubClass()) {
-    //
-    //      for {
-    //        subClass <- ontClass.listSubClasses().toList.asScala.toList
-    //        printer = println(subClass.toString())
-    //      } yield { subClass }
-    //
-    //    }
+       
+//        val ontClass = DBpediaOntologyAccess.getOntClass("http://dbpedia.org/ontology/Biomolecule")
+//    
+//        if (ontClass.hasSubClass()) {
+//    
+//          for {
+//            subClass <- ontClass.listSubClasses().toList.asScala.toList
+//            printer = println(subClass.toString())
+//          } yield { subClass }
+//    
+//        }
   
 }

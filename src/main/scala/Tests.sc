@@ -15,27 +15,25 @@ object Tests {
  val mySet: Set[Int] = Set(1,2,3,4)               //> mySet  : Set[Int] = Set(1, 2, 3, 4)
 mySet contains(5)                                 //> res2: Boolean = false
 
-
-import sun.security.provider.MD5
-import java.security.MessageDigest
-
-    val md5: MessageDigest = MessageDigest.getInstance("MD5")
-                                                  //> md5  : java.security.MessageDigest = MD5 Message Digest from SUN, <initializ
-                                                  //| ed>
-                                                  //| 
-    md5.update("hallo".getBytes());
-    val id = md5.digest().map("%02X".format(_)).mkString
-                                                  //> id  : String = 598D4C200461B81522A3328565C25F7C
- import de.unimannheim.dws.preprocessing.Util
-val d1:Double = 3                                 //> d1  : Double = 3.0
-val d2:Double = 4353453.34487567635               //> d2  : Double = 4353453.344875677
-val res = (d1/d2).toFloat                         //> res  : Float = 6.891081E-7
-val res2 = Util.round(res, 10)                    //> res2  : Double = 6.891E-7
+val myList = mySet.toList:+1                      //> myList  : List[Int] = List(1, 2, 3, 4, 1)
 
 
-val md51 = Util.md5("http://dbpedia.org/ontology/abstract@fr")
-                                                  //> md51  : String = 54366E57972BCE3240E6587CDA2ABB5D
-val md52 = Util.md5("http://dbpedia.org/ontology/birthDate")
-                                                  //> md52  : String = C212D09402AF52A91979F9E91B5287AF
-
+val pairs = for(x <- myList; y <- myList) yield (x, y)
+                                                  //> pairs  : List[(Int, Int)] = List((1,1), (1,2), (1,3), (1,4), (1,1), (2,1), (
+                                                  //| 2,2), (2,3), (2,4), (2,1), (3,1), (3,2), (3,3), (3,4), (3,1), (4,1), (4,2), 
+                                                  //| (4,3), (4,4), (4,1), (1,1), (1,2), (1,3), (1,4), (1,1))
+import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
+import scala.collection.JavaConverters._
+val node = DBpediaOntologyAccess.getOntClass("http://www.w3.org/2002/07/owl#Thing")
+                                                  //> log4j:WARN No appenders could be found for logger (org.apache.jena.riot.stre
+                                                  //| am.JenaIOEnvironment).
+                                                  //| log4j:WARN Please initialize the log4j system properly.
+                                                  //| log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for mor
+                                                  //| e info.
+                                                  //| node  : com.hp.hpl.jena.ontology.OntClass = http://www.w3.org/2002/07/owl#Th
+                                                  //| ing
+println(node.hasSuperClass(node, true))           //> true
+val superNodes = node.listSuperClasses().asScala.toList
+                                                  //> superNodes  : List[com.hp.hpl.jena.ontology.OntClass] = List()
+println(superNodes)                               //> List()
 }

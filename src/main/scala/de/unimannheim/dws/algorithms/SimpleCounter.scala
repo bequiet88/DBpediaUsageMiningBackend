@@ -45,13 +45,12 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
         if (listClassProp.size > 0) {
 
           mapClassProp = listClassProp.foldLeft(mapClassProp)((i, row) => {
-            if (i.size % 1000 == 0) {
-              println("Size of Map: " + i.size)
-            }
-
             if (i.contains((row._1.get, row._2.get))) {
               i + (((row._1.get, row._2.get), i(row._1.get, row._2.get) + 1))
             } else {
+              if (i.size % 1000 == 0) {
+                println("Size of Map: " + i.size)
+              }
               i + (((row._1.get, row._2.get), 1))
             }
           })
@@ -162,6 +161,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
        * In case all elements are full, return a sorted list, otherwise go into the recursion
        */
       if (resMapPropIds._2.size > 0) {
+        println("Processed Class: "+classLabel._2+", remaining properties: "+resMapPropIds._2.size)
         recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
       } else resMapPropIds._1.toList.sortBy({ _._2 }).reverse
     } else List()
@@ -169,8 +169,8 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
   private def recursiveRetrieval(propertyIds: List[String], classLabel: (String, Option[String]), resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
 
-    lazy val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
-    val superClass = ontClass.getSuperClass()
+    val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
+    val superClass = ontClass.listSuperClasses(true).asScala.toList(0)
     val subClasses = superClass.listSubClasses(true).asScala.toList diff List(ontClass)
 
     /*
@@ -180,14 +180,14 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       /*
        * Subclasses that are directly leaf classes
        */
-      if (ontClass.hasSubClass() == false) {
+      if (ontClass.listSubClasses().asScala.toList.size==0) {
         i :+ ontClass
       } /*
        * In case subclasses are NOT directly leaf classes, resolve their leaf sub classes
        */ else {
         val currentSubClasses = ontClass.listSubClasses().asScala.toList
         i ++ currentSubClasses.foldLeft(List[OntClass]())((j, ontSubClass) => {
-          if (ontSubClass.hasSubClass() == false) {
+          if (ontSubClass.listSubClasses().asScala.toList.size==0) {
             j :+ ontSubClass
           } else j
         })
@@ -203,7 +203,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
         val properties = (for {
           p <- PropertiesUnique
           cp <- ClassPropertyCounter
-          if cp.classId === Util.md5(classLabel.getLabel("EN"))
+          if cp.classId === Util.md5(classLabel.getURI())
           if cp.propertyId === p.id
           if cp.propertyId inSetBind propertyIds
         } yield (p.id, p.prefix, p.property, cp.count)).list
@@ -222,10 +222,20 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       } else (i._1, i._2)
     })
 
-    if (resMapPropIds._2.size > 0 && superClass.hasSuperClass()) {
-      recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getLabel("EN")), Some(superClass.getLabel("EN"))), resMapPropIds._1, weight / 2)
+    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size>0) {
+      println("Processed Class: "+superClass.getURI+", remaining properties: "+resMapPropIds._2.size)
+      recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getURI), Some(superClass.getURI)), resMapPropIds._1, weight / 2)
     } else {
-      val remainingPropIds = resMapPropIds._2.map(p => (p, 0D)).toMap
+      val remainingPropIds = resMapPropIds._2.map(prop => {
+        val propLabel = (for {
+          p <- PropertiesUnique if p.id === prop
+        } yield (p.prefix, p.property)).list
+        
+        if(propLabel.size>0)
+         (propLabel.head._1.get + propLabel.head._2.get, 0D)
+        else ("property not in data", 0D)
+      }).toMap
+      
       resMapPropIds._1.++(remainingPropIds)
     }
   }
