@@ -1,13 +1,18 @@
 package de.unimannheim.dws.algorithms
 
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileWriter
+
+import scala.collection.JavaConverters._
 import scala.slick.driver.JdbcDriver.backend.Database
 import scala.slick.driver.PostgresDriver.simple._
+import scala.slick.jdbc.GetResult
+import scala.slick.jdbc.{ StaticQuery => Q }
+import scala.collection.mutable.StringBuilder
+
 import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.Util
-import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
-import scala.collection.JavaConverters._
-import com.hp.hpl.jena.ontology.OntClass
-import scala.util.control._
 
 object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)] {
 
@@ -72,117 +77,123 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)]
    * 1. use index
    */
   def retrieve(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
-    ???
-    //      if (triples.size > 0) {
-    //  
-    //        val entityId = Util.md5(triples.head._1)
-    //  
-    //        val propertyIds = triples.map(t => {
-    //          Util.md5(t._2)
-    //        })
-    //  
-    //        /*
-    //         * Read class label for this entity from DB
-    //         */
-    //        val classLabel = (for {
-    //          //        e <- EntitiesUnique if e.id === entityId
-    //          //        c <- ClassesUnique if (c.id === e.classId)
-    //          (c, e) <- ClassesUnique innerJoin EntitiesUnique on (_.id === _.classId) if (e.id === entityId)
-    //        } yield (c.id, c.label)).first
-    //  
-    //        /*
-    //         * Get all properties requested together with this entity's class
-    //         */
-    //        val properties = (for {
-    //          p <- PropertiesUnique
-    //          cp <- ClassPropertyCounter
-    //          if cp.classId === classLabel._1
-    //          if cp.propertyId === p.id
-    //          if cp.propertyId inSetBind propertyIds
-    //        } yield (p.id, p.prefix, p.property, cp.count)).list
-    //  
-    //        /*
-    //         * check whether props from DB present in this triple list's predicates
-    //         */
-    //        val resMapPropIds = properties.foldLeft((Map[String, Double](), propertyIds))((i, prop) => {
-    //          val propLabel = prop._2.get + prop._3.get
-    //          if (i._2.contains(prop._1)) {
-    //            (i._1.+((propLabel, prop._4.get)), i._2 diff List(prop._1))
-    //          } else {
-    //            (i._1, i._2)
-    //          }
-    //        })
-    //  
-    //        /*
-    //         * In case all elements are full, return a sorted list, otherwise go into the recursion
-    //         */
-    //        if (resMapPropIds._2.size > 0) {
-    //          recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
-    //        } else resMapPropIds._1.toList.sortBy({ _._2 }).reverse
-    //      } else List()
-  }
 
-  //  private def recursiveRetrieval(propertyIds: List[String], classLabel: (String, Option[String]), resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
-  //
-  //    lazy val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
-  //    val superClass = ontClass.getSuperClass()
-  //    val subClasses = superClass.listSubClasses(true).asScala.toList diff List(ontClass)
-  //
-  //    /*
-  //     * Find all leaf classes on this level of the ontology
-  //     */
-  //    val leafClasses = subClasses.foldLeft(List[OntClass]())((i, ontClass) => {
-  //      /*
-  //       * Subclasses that are directly leaf classes
-  //       */
-  //      if (ontClass.hasSubClass() == false) {
-  //        i :+ ontClass
-  //      } /*
-  //       * In case subclasses are NOT directly leaf classes, resolve their leaf sub classes
-  //       */ else {
-  //        val currentSubClasses = ontClass.listSubClasses().asScala.toList
-  //        i ++ currentSubClasses.foldLeft(List[OntClass]())((j, ontSubClass) => {
-  //          if (ontSubClass.hasSubClass() == false) {
-  //            j :+ ontSubClass
-  //          } else j
-  //        })
-  //      }
-  //    })
-  //
-  //    val resMapPropIds: (Map[String, Double], List[String]) = leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
-  //
-  //      if (i._2.size > 0) {
-  //        /*
-  //       * Get all properties requested together with this entity's class
-  //       */
-  //        val properties = (for {
-  //          p <- PropertiesUnique
-  //          cp <- ClassPropertyCounter
-  //          if cp.classId === Util.md5(classLabel.getLabel("EN"))
-  //          if cp.propertyId === p.id
-  //          if cp.propertyId inSetBind propertyIds
-  //        } yield (p.id, p.prefix, p.property, cp.count)).list
-  //
-  //        /*
-  //       * check whether props from DB present in this triple list's predicates
-  //       */
-  //        properties.foldLeft((i._1, i._2))((j, prop) => {
-  //          val propLabel = prop._2.get + prop._3.get
-  //          if (j._2.contains(prop._1)) {
-  //            (j._1.+((propLabel, prop._4.get * weight)), j._2 diff List(prop._1))
-  //          } else {
-  //            (j._1, i._2)
-  //          }
-  //        })
-  //      } else (i._1, i._2)
-  //    })
-  //
-  //    if (resMapPropIds._2.size > 0 && superClass.hasSuperClass()) {
-  //      recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getLabel("EN")), Some(superClass.getLabel("EN"))), resMapPropIds._1, weight / 2)
-  //    } else {
-  //      val remainingPropIds = resMapPropIds._2.map(p => (p, 0D)).toMap
-  //      resMapPropIds._1.++(remainingPropIds)
-  //    }
-  //  }
-  //
+    val properties = triples.map(_._2).removeDuplicates
+
+    println("Unique Properties generated from TripleList: " + properties.size)
+
+    // Generate temporary Maps mapping 1.) Integer Index to URI 2.) MD5 to Integer Index
+    val propertyIdMaps = properties.zipWithIndex.foldLeft((Map[Int, String](), Map[String, Int]())) { (i, t) =>
+      {
+        val id = Util.md5(t._1)
+        (i._1 + ((t._2, t._1)), i._2 + ((id, t._2)))
+      }
+    }
+
+    // sorted sequence of integers
+    val propertyIntIdsList = for (i <- 0 to propertyIdMaps._1.size-1) yield i
+
+    // all pairs from the properties MD5 hashes
+    val pairs = for (x <- propertyIdMaps._2.keySet; y <- propertyIdMaps._2.keySet) yield (x, y)
+
+    // string with all pairs for DB Select Statement
+    val pairString = pairs.foldLeft(new StringBuilder())((i, row) => {
+      if (i.length() == 0) i.append("'" + row._1 + row._2 + "'")
+      else i.append(",'" + row._1 + row._2 + "'")
+    })
+
+    println("Pairs generated from TripleList: " + pairs.size)
+
+    // List of Pairs found on DB with a count assigned to them
+    val propPairWeightList = Q.queryNA[PairCounterRow]("select prop_1_id, prop_2_id, count from pair_counter where concat(prop_1_id, prop_2_id) in (" + pairString.toString + ")")
+      .list
+
+    println("Pairs read from DB: " + propPairWeightList.size)
+
+    //    val propPairWeightMapQ = (for {
+    //      pc <- PairCounter
+    //      if pc.prop1Id inSetBind pairs.map(_._1)
+    //      if pc.prop2Id inSetBind pairs.map(_._2)
+    //    } yield (pc.prop1Id, pc.prop2Id, pc.count.get))
+
+    //    println(propPairWeightMapQ.selectStatement)
+
+    // Two lists: 1.) 
+    val propPairWeightUniqueLists = propPairWeightList.foldLeft((Map[(Int, Int), Double](), propPairWeightList))((i, row) => {
+
+      def getIds(a: ((Int, Int), Double)): (Int, Int) = {
+        if (a._1._1 < a._1._2) (a._1._1, a._1._2)
+        else (a._1._2, a._1._1)
+      }
+
+      val sameElem = (i._2 diff List(row)).filter(_.equalsByReverseIds(row)).headOption
+      val rowTransformed = ((propertyIdMaps._2.get(row.prop1Id).get, propertyIdMaps._2.get(row.prop2Id).get), row.count.get.asInstanceOf[Double])
+      val ids = getIds(rowTransformed)
+
+      sameElem match {
+        case x: Some[PairCounterRow] => {
+          println("same pair found")
+          (i._1 + (((ids._1, ids._2), (row.count.get + x.get.count.get).asInstanceOf[Double])), i._2 diff List(row, sameElem.get))
+        }
+        case None => {
+          if (i._1.contains(ids._1, ids._2) == true) {
+
+            (i._1, i._2 diff List(row))
+
+          } else {
+
+            (i._1 + (((ids._1, ids._2), (row.count.get).asInstanceOf[Double])), i._2 diff List(row))
+
+          }
+        }
+      }
+    })
+    
+    println(""+propPairWeightUniqueLists._2.size);
+ 
+
+    println("Unique pairs read from DB: " + propPairWeightUniqueLists._1.size)
+    propPairWeightUniqueLists._1.foreach(p => println(propertyIdMaps._1.get(p._1._1) + " " + propertyIdMaps._1.get(p._1._2) + " " + p._2))
+    propPairWeightUniqueLists._1.foreach(p => println(p._1._1 + " " + p._1._2 + " " + p._2))
+
+    val propertyMatrix = propertyIntIdsList.foldLeft(List[(Int, Int, Double)]())((i, id) => {
+
+      // inner loop to iterate only over all pairs (ab/ba) once
+      val listInnerLoop = propertyIntIdsList.slice(id, propertyIntIdsList.size)
+
+      val tempPropMatrix = listInnerLoop.map(subId => {
+        //        if (id == subId) {
+        //          (id, subId, 0D)
+        //        } else {
+        val count = propPairWeightUniqueLists._1.getOrElse((id, subId), 0D)
+        if (count == 0D) {
+          (id, subId, 10D)
+          //          } else if (count == 0D) {
+          //            (id, subId, 0D)
+        } else {
+          (id, subId, 1 / count)
+        }
+        //        }
+      })
+      i ++ tempPropMatrix
+    })
+
+    println("Pairs about to be written to file: " + propertyMatrix.size)
+
+        val file: File = new File("C:/Temp/distance_matrix.ascii");
+        file.getParentFile().mkdirs();
+    
+        val out: BufferedWriter = new BufferedWriter(new FileWriter(file));
+    
+        val last = propertyMatrix.reverse.head
+    
+        propertyMatrix.map(p => {
+          out.write(p._1 + " " + p._2 + " " + p._3)
+          if (!p.eq(last)) out.newLine()
+        })
+        out.flush()
+        out.close()
+
+    List()
+  }
 }

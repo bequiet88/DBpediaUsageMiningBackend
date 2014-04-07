@@ -13,9 +13,9 @@ import java.io.File
 object SimpleCountController extends App {
   DbConn.openConn withSession { implicit session =>
 
-//    createClassPropertyPairs(1000)
+    createClassPropertyPairs(1000)
     val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/berlin_test_triples.txt")
-    readClassPropertyPairs(file)
+//    readClassPropertyPairs(file)
   }
 
   def createClassPropertyPairs(stepSize: Int)(implicit session: slick.driver.PostgresDriver.backend.Session) = {

@@ -42,7 +42,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
         val listClassProp = queryClassProp.list
 
-        if (listClassProp.size > 0) {
+        if (listClassProp.size < 0) {
 
           mapClassProp = listClassProp.foldLeft(mapClassProp)((i, row) => {
             if (i.contains((row._1.get, row._2.get))) {
@@ -54,8 +54,9 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
               i + (((row._1.get, row._2.get), 1))
             }
           })
+        }
 
-        } else {
+        if (listClassProp.size < limit) {
           loop.break
         }
         offset = offset + limit
@@ -161,7 +162,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
        * In case all elements are full, return a sorted list, otherwise go into the recursion
        */
       if (resMapPropIds._2.size > 0) {
-        println("Processed Class: "+classLabel._2+", remaining properties: "+resMapPropIds._2.size)
+        println("Processed Class: " + classLabel._2 + ", remaining properties: " + resMapPropIds._2.size)
         recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
       } else resMapPropIds._1.toList.sortBy({ _._2 }).reverse
     } else List()
@@ -180,14 +181,14 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       /*
        * Subclasses that are directly leaf classes
        */
-      if (ontClass.listSubClasses().asScala.toList.size==0) {
+      if (ontClass.listSubClasses().asScala.toList.size == 0) {
         i :+ ontClass
       } /*
        * In case subclasses are NOT directly leaf classes, resolve their leaf sub classes
        */ else {
         val currentSubClasses = ontClass.listSubClasses().asScala.toList
         i ++ currentSubClasses.foldLeft(List[OntClass]())((j, ontSubClass) => {
-          if (ontSubClass.listSubClasses().asScala.toList.size==0) {
+          if (ontSubClass.listSubClasses().asScala.toList.size == 0) {
             j :+ ontSubClass
           } else j
         })
@@ -222,20 +223,20 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       } else (i._1, i._2)
     })
 
-    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size>0) {
-      println("Processed Class: "+superClass.getURI+", remaining properties: "+resMapPropIds._2.size)
+    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size > 0) {
+      println("Processed Class: " + superClass.getURI + ", remaining properties: " + resMapPropIds._2.size)
       recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getURI), Some(superClass.getURI)), resMapPropIds._1, weight / 2)
     } else {
       val remainingPropIds = resMapPropIds._2.map(prop => {
         val propLabel = (for {
           p <- PropertiesUnique if p.id === prop
         } yield (p.prefix, p.property)).list
-        
-        if(propLabel.size>0)
-         (propLabel.head._1.get + propLabel.head._2.get, 0D)
+
+        if (propLabel.size > 0)
+          (propLabel.head._1.get + propLabel.head._2.get, 0D)
         else ("property not in data", 0D)
       }).toMap
-      
+
       resMapPropIds._1.++(remainingPropIds)
     }
   }
