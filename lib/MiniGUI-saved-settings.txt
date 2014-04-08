@@ -100,3 +100,28 @@ D:\ownCloud\Data\Studium\Master_Thesis\04_Data_Results\elki\res_hierarchical
 -vis.window.title
 ExtractFlatClusteringFromHierarchy
 
+dbscan_general_ext_text_dist_matrix
+-dbc.in
+C:\Temp\0_168.txt
+-dbc.filter
+FixedDBIDsFilter
+-dbc.startid
+0
+-time
+-algorithm
+clustering.gdbscan.GeneralizedDBSCAN
+-algorithm.distancefunction
+external.FileBasedDoubleDistanceFunction
+-distance.matrix
+C:\Temp\distance_matrix.ascii
+-dbscan.epsilon
+0.5
+-dbscan.minpts
+5
+-resulthandler
+ResultWriter,de.lmu.ifi.dbs.elki.visualization.gui.ResultVisualizer
+-out
+D:\ownCloud\Data\Studium\Master_Thesis\04_Data_Results\elki\res_dbscan_general
+-vis.window.title
+DBSCAN General
+

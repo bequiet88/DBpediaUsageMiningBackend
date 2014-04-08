@@ -1,13 +1,15 @@
 package de.unimannheim.dws.algorithms
 
+import scala.collection.JavaConverters._
 import scala.slick.driver.JdbcDriver.backend.Database
 import scala.slick.driver.PostgresDriver.simple._
-import de.unimannheim.dws.models.postgre.Tables._
-import de.unimannheim.dws.preprocessing.Util
-import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
-import scala.collection.JavaConverters._
-import com.hp.hpl.jena.ontology.OntClass
 import scala.util.control._
+
+import com.hp.hpl.jena.ontology.OntClass
+
+import de.unimannheim.dws.models.postgre.Tables._
+import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
+import de.unimannheim.dws.preprocessing.Util
 
 object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
@@ -110,46 +112,45 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
 
     resList.toList
   }
-
   /**
    * Method to retrieve a sorted map of properties
-   * possible improvements
-   * 1. use index
    */
   def retrieve(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     if (triples.size > 0) {
-
       val entityId = Util.md5(triples.head._1)
-
       val propertyIds = triples.map(t => {
-        Util.md5(t._2)
-      })
+        Util.md5(t._2.trim())
+      }).removeDuplicates
 
       /*
        * Read class label for this entity from DB
        */
       val classLabel = (for {
-        //        e <- EntitiesUnique if e.id === entityId
-        //        c <- ClassesUnique if (c.id === e.classId)
         (c, e) <- ClassesUnique innerJoin EntitiesUnique on (_.id === _.classId) if (e.id === entityId)
       } yield (c.id, c.label)).first
 
       /*
        * Get all properties requested together with this entity's class
        */
-      val properties = (for {
+      val propertiesAll = (for {
+        c <- ClassesUnique
         p <- PropertiesUnique
         cp <- ClassPropertyCounter
-        if cp.classId === classLabel._1
+        if cp.classId === c.id
         if cp.propertyId === p.id
-        if cp.propertyId inSetBind propertyIds
-      } yield (p.id, p.prefix, p.property, cp.count)).list
+      } yield (c.label, (p.id, p.prefix, p.property, cp.count))).list.groupBy(l => l._1.get)
+      
+      val properties = propertiesAll.get(classLabel._2.get).getOrElse(List()).map(_._2).filter(p => propertyIds.contains(p._1))
+
+//      println("For " + classLabel._2 + " properties found on DB " + properties.size)
 
       /*
        * check whether props from DB present in this triple list's predicates
        */
       val resMapPropIds = properties.foldLeft((Map[String, Double](), propertyIds))((i, prop) => {
+        //        println("Found props: "+ i._1.size + ", remaining size "+ i._2.size)
+
         val propLabel = prop._2.get + prop._3.get
         if (i._2.contains(prop._1)) {
           (i._1.+((propLabel, prop._4.get)), i._2 diff List(prop._1))
@@ -159,18 +160,45 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       })
 
       /*
+       * Check whether class subclasses exists and contain properties
+       */
+      val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
+      val subClasses = ontClass.listSubClasses().asScala.toList diff List(ontClass)
+      val subResMapPropIds = {
+        if (subClasses.size > 0) {
+          resMapGenerator(propertiesAll, resMapPropIds._2, subClasses, resMapPropIds._1, 1D)
+        } else {
+          (Map[String, Double](), resMapPropIds._2)
+        }
+      }
+
+      /*
+       * Check whether class super classes exists and contain properties
+       */
+    
+      val superClasses = ontClass.listSuperClasses().asScala.toList diff List(ontClass)
+      val superResMapPropIds = {
+        if (subClasses.size > 0) {
+          resMapGenerator(propertiesAll, subResMapPropIds._2, superClasses, subResMapPropIds._1, 1D)
+        } else {
+          (Map[String, Double](), subResMapPropIds._2)
+        }
+      }
+
+      println("Processed Class: " + classLabel._2 + ", remaining properties: " + superResMapPropIds._2.size + ", found properties: " + superResMapPropIds._1.size)
+
+      /*
        * In case all elements are full, return a sorted list, otherwise go into the recursion
        */
-      if (resMapPropIds._2.size > 0) {
-        println("Processed Class: " + classLabel._2 + ", remaining properties: " + resMapPropIds._2.size)
-        recursiveRetrieval(resMapPropIds._2, classLabel, resMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
-      } else resMapPropIds._1.toList.sortBy({ _._2 }).reverse
+      if (superResMapPropIds._2.size > propertyIds.size/2D) {
+        recursiveRetrieval(propertiesAll, superResMapPropIds._2, ontClass, superResMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
+      } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
     } else List()
   }
 
-  private def recursiveRetrieval(propertyIds: List[String], classLabel: (String, Option[String]), resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
 
-    val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
+  private def recursiveRetrieval(propertiesAll:   Map[String,List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], ontClass: OntClass, resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
+
     val superClass = ontClass.listSuperClasses(true).asScala.toList(0)
     val subClasses = superClass.listSubClasses(true).asScala.toList diff List(ontClass)
 
@@ -195,7 +223,200 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
       }
     })
 
-    val resMapPropIds: (Map[String, Double], List[String]) = leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
+    val resMapPropIds: (Map[String, Double], List[String]) = resMapGenerator(propertiesAll, propertyIds, leafClasses, resMap, weight)
+
+    println("Processed Super Class: " + superClass.getURI + ", remaining properties: " + resMapPropIds._2.size + ", found properties: " + resMapPropIds._1.size)
+
+    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size > 0) {
+      recursiveRetrieval(propertiesAll, resMapPropIds._2, superClass, resMapPropIds._1, weight / 2)
+    } else {
+      // code read label from all other properties
+      //      val remainingPropIds = resMapPropIds._2.map(prop => {
+      //        val propLabel = (for {
+      //          p <- PropertiesUnique if p.id === prop
+      //        } yield (p.prefix, p.property)).list
+      //
+      //        if (propLabel.size > 0)
+      //          (propLabel.head._1.get + propLabel.head._2.get, 0D)
+      //        else ("property not in data", 0D)
+      //      }).toMap
+
+      resMapPropIds._1 //.++(remainingPropIds)
+    }
+  }
+
+  private def resMapGenerator(propertiesAll: Map[String,List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], leafClasses: List[OntClass], resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+    leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
+
+      if (i._2.size > 0) {
+        /*
+       * Get all properties requested together with this entity's class
+       */
+        val properties = propertiesAll.get(classLabel.getURI()).getOrElse(List()).map(_._2).filter(p => propertyIds.contains(p._1))
+
+//        println("For " + classLabel.getURI() + " properties found on DB " + properties.size)
+
+        /*
+       * check whether props from DB present in this triple list's predicates
+       */
+        properties.foldLeft((i._1, i._2))((j, prop) => {
+          val propLabel = prop._2.get + prop._3.get
+          if (!j._1.contains(propLabel)) {
+            (j._1.+((propLabel, prop._4.get * weight)), j._2 diff List(prop._1))
+          } else {
+            (j._1, i._2)
+          }
+        })
+      } else (i._1, i._2)
+    })
+  }
+  
+  
+  
+  
+  
+  
+  /*********************************
+   * Methods for Slow Implementation
+   *********************************/
+
+  /**
+   * Method to retrieve a sorted map of properties
+   */
+  def retrieveSlow(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+    if (triples.size > 0) {
+      val entityId = Util.md5(triples.head._1)
+      val propertyIds = triples.map(t => {
+        Util.md5(t._2.trim())
+      }).removeDuplicates
+
+      /*
+       * Read class label for this entity from DB
+       */
+      val classLabel = (for {
+        (c, e) <- ClassesUnique innerJoin EntitiesUnique on (_.id === _.classId) if (e.id === entityId)
+      } yield (c.id, c.label)).first
+
+      /*
+       * Get all properties requested together with this entity's class
+       */
+      val properties = (for {
+        p <- PropertiesUnique
+        cp <- ClassPropertyCounter
+        if cp.classId === classLabel._1
+        if cp.propertyId === p.id
+        if cp.propertyId inSetBind propertyIds
+      } yield (p.id, p.prefix, p.property, cp.count)).list
+
+      println("For " + classLabel._2 + " properties found on DB " + properties.size)
+
+      /*
+       * check whether props from DB present in this triple list's predicates
+       */
+      val resMapPropIds = properties.foldLeft((Map[String, Double](), propertyIds))((i, prop) => {
+        //        println("Found props: "+ i._1.size + ", remaining size "+ i._2.size)
+
+        val propLabel = prop._2.get + prop._3.get
+        if (i._2.contains(prop._1)) {
+          (i._1.+((propLabel, prop._4.get)), i._2 diff List(prop._1))
+        } else {
+          (i._1, i._2)
+        }
+      })
+
+      /*
+       * Check whether class subclasses exists and contain properties
+       */
+      val ontClass = DBpediaOntologyAccess.getOntClass(classLabel._2.get)
+      val subClasses = ontClass.listSubClasses().asScala.toList diff List(ontClass)
+      val subResMapPropIds = {
+        if (subClasses.size > 0) {
+          resMapGeneratorSlow(resMapPropIds._2, subClasses, resMapPropIds._1, 1D)
+        } else {
+          (Map[String, Double](), resMapPropIds._2)
+        }
+      }
+
+      /*
+       * Check whether class superclasses exists and contain properties
+       */
+    
+      val superClasses = ontClass.listSuperClasses().asScala.toList diff List(ontClass)
+      val superResMapPropIds = {
+        if (subClasses.size > 0) {
+          resMapGeneratorSlow(subResMapPropIds._2, superClasses, subResMapPropIds._1, 1D)
+        } else {
+          (Map[String, Double](), subResMapPropIds._2)
+        }
+      }
+
+      //      val fullResMap = resMapPropIds._1 ++ SubResMapPropIds._1.toList
+
+      println("Processed Class: " + classLabel._2 + ", remaining properties: " + superResMapPropIds._2.size + ", found properties: " + superResMapPropIds._1.size)
+
+      /*
+       * In case all elements are full, return a sorted list, otherwise go into the recursion
+       */
+      if (superResMapPropIds._2.size > propertyIds.size/2D) {
+        recursiveRetrievalSlow(superResMapPropIds._2, ontClass, superResMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
+      } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
+    } else List()
+  }
+
+  private def recursiveRetrievalSlow(propertyIds: List[String], ontClass: OntClass, resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
+
+    val superClass = ontClass.listSuperClasses(true).asScala.toList(0)
+    val subClasses = superClass.listSubClasses(true).asScala.toList diff List(ontClass)
+
+    /*
+     * Find all leaf classes on this level of the ontology
+     */
+    val leafClasses = subClasses.foldLeft(List[OntClass]())((i, ontClass) => {
+      /*
+       * Subclasses that are directly leaf classes
+       */
+      if (ontClass.listSubClasses().asScala.toList.size == 0) {
+        i :+ ontClass
+      } /*
+       * In case subclasses are NOT directly leaf classes, resolve their leaf sub classes
+       */ else {
+        val currentSubClasses = ontClass.listSubClasses().asScala.toList
+        i ++ currentSubClasses.foldLeft(List[OntClass]())((j, ontSubClass) => {
+          if (ontSubClass.listSubClasses().asScala.toList.size == 0) {
+            j :+ ontSubClass
+          } else j
+        })
+      }
+    })
+
+    val resMapPropIds: (Map[String, Double], List[String]) = resMapGeneratorSlow(propertyIds, leafClasses, resMap, weight)
+
+    //    val fullResMap = resMap ++ resMapPropIds._1.toList
+
+    println("Processed Super Class: " + superClass.getURI + ", remaining properties: " + resMapPropIds._2.size + ", found properties: " + resMapPropIds._1.size)
+
+    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size > 0) {
+      recursiveRetrievalSlow(resMapPropIds._2, superClass, resMapPropIds._1, weight / 2)
+    } else {
+      //      val remainingPropIds = resMapPropIds._2.map(prop => {
+      //        val propLabel = (for {
+      //          p <- PropertiesUnique if p.id === prop
+      //        } yield (p.prefix, p.property)).list
+      //
+      //        if (propLabel.size > 0)
+      //          (propLabel.head._1.get + propLabel.head._2.get, 0D)
+      //        else ("property not in data", 0D)
+      //      }).toMap
+
+      resMapPropIds._1 //.++(remainingPropIds)
+    }
+  }
+
+  private def resMapGeneratorSlow(propertyIds: List[String], leafClasses: List[OntClass], resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+    leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
 
       if (i._2.size > 0) {
         /*
@@ -206,15 +427,17 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
           cp <- ClassPropertyCounter
           if cp.classId === Util.md5(classLabel.getURI())
           if cp.propertyId === p.id
-          if cp.propertyId inSetBind propertyIds
+          if cp.propertyId inSetBind i._2
         } yield (p.id, p.prefix, p.property, cp.count)).list
+
+        println("For " + classLabel.getURI() + " properties found on DB " + properties.size)
 
         /*
        * check whether props from DB present in this triple list's predicates
        */
         properties.foldLeft((i._1, i._2))((j, prop) => {
           val propLabel = prop._2.get + prop._3.get
-          if (j._2.contains(prop._1)) {
+          if (!j._1.contains(propLabel)) {
             (j._1.+((propLabel, prop._4.get * weight)), j._2 diff List(prop._1))
           } else {
             (j._1, i._2)
@@ -222,23 +445,6 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
         })
       } else (i._1, i._2)
     })
-
-    if (resMapPropIds._2.size > 0 && superClass.listSuperClasses().asScala.toList.size > 0) {
-      println("Processed Class: " + superClass.getURI + ", remaining properties: " + resMapPropIds._2.size)
-      recursiveRetrieval(resMapPropIds._2, (Util.md5(superClass.getURI), Some(superClass.getURI)), resMapPropIds._1, weight / 2)
-    } else {
-      val remainingPropIds = resMapPropIds._2.map(prop => {
-        val propLabel = (for {
-          p <- PropertiesUnique if p.id === prop
-        } yield (p.prefix, p.property)).list
-
-        if (propLabel.size > 0)
-          (propLabel.head._1.get + propLabel.head._2.get, 0D)
-        else ("property not in data", 0D)
-      }).toMap
-
-      resMapPropIds._1.++(remainingPropIds)
-    }
   }
 
 }
