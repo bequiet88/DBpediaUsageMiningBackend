@@ -1,160 +1,186 @@
 package de.unimannheim.dws.controller
 
-import de.unimannheim.dws.models.mongo.CommonLogFile
-import org.bson.types.ObjectId
-import org.joda.time.DateTime
-import de.unimannheim.dws.models.mongo.CommonLogFileDAO
-import com.mongodb.casbah.commons.MongoDBObject
-import com.mongodb.casbah.commons.conversions.scala.{ RegisterConversionHelpers, RegisterJodaTimeConversionHelpers }
-import de.unimannheim.dws.preprocessing.LogFileParser
-import scala.util.matching.Regex
-import java.io.File
-import java.io.FileInputStream
-import de.unimannheim.dws.models.mongo.SimpleTripleDAO
-import com.hp.hpl.jena.query.QueryFactory
-import com.hp.hpl.jena.query.QueryParseException
-import com.hp.hpl.jena.query.Query
-import de.unimannheim.dws.models.mongo.SparqlQuery
-import de.unimannheim.dws.models.mongo.SparqlQueryDAO
-import org.apache.commons.csv.CSVPrinter
 import java.io.BufferedWriter
+import java.io.File
 import java.io.FileWriter
+
 import org.apache.commons.csv.CSVFormat
+import org.apache.commons.csv.CSVPrinter
+import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
+
+import com.hp.hpl.jena.query.Query
+import com.mongodb.casbah.commons.MongoDBObject
+import com.mongodb.casbah.commons.conversions.scala.RegisterConversionHelpers
+import com.mongodb.casbah.commons.conversions.scala.RegisterJodaTimeConversionHelpers
+
+import de.unimannheim.dws.models.mongo.CommonLogFile
+import de.unimannheim.dws.models.mongo.CommonLogFileDAO
+import de.unimannheim.dws.models.mongo.SimpleTripleDAO
+import de.unimannheim.dws.models.mongo.SparqlQueryDAO
+import de.unimannheim.dws.models.postgre.DbConn
+import de.unimannheim.dws.models.postgre.Tables._
+import scala.slick.driver.PostgresDriver.simple._
+import scala.slick.driver.JdbcDriver.backend.Database
 
 // http://notes.3kbo.com/scala
 
 object StatisticController extends App {
 
-  // generate CSVPrinter Object
-  val dateTimeFormatter = DateTimeFormat.forPattern("ddMMyy_kkmmss");
-  val path = "D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/statistics/statistics_" + DateTime.now().toString(dateTimeFormatter) + ".csv"
-  implicit val writer: BufferedWriter = new BufferedWriter(new FileWriter(
-    new File(path)));
-  implicit val csvPrinter: CSVPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);
-  csvPrinter.print("sep=,")
-  csvPrinter.println()
+  DbConn.openConn withSession { implicit session =>
 
-  /*
+    // generate CSVPrinter Object
+    val dateTimeFormatter = DateTimeFormat.forPattern("ddMMyy_kkmmss");
+    val path = "D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/statistics/statistics_" + DateTime.now().toString(dateTimeFormatter) + ".csv"
+    implicit val writer: BufferedWriter = new BufferedWriter(new FileWriter(
+      new File(path)));
+    implicit val csvPrinter: CSVPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);
+    csvPrinter.print("sep=,")
+    csvPrinter.println()
+
+    /*
    * Converters for Joda Time
    */
-  RegisterConversionHelpers()
-  RegisterJodaTimeConversionHelpers()
+    RegisterConversionHelpers()
+    RegisterJodaTimeConversionHelpers()
 
-  /*
+    /*
    * Data Set Size Statistics
    */
-  println("Data Set Statistics");
-  val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
-    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-    //    .skip(1)
-    //    .limit(613)
-    .toList
+    println("Data Set Statistics");
+    val rawCLFs = CommonLogFileDAO.find(ref = MongoDBObject("httpStatus" -> "200"))
+      .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
+      //    .skip(1)
+      //    .limit(613)
+      .toList
 
-  writeOutputToFile("", List(("Data Set Size", "", ""), ("" + rawCLFs.size, "", "")))
-  
-  /*
+    writeOutputToFile("", List(("Data Set Size", "", ""), ("" + rawCLFs.size, "", "")))
+
+    /*
    * Content Type Statistics
    * http://wiki.opensemanticframework.org/index.php/SPARQL#Content_Returned
    */
-  println("Content Type Statistics");
-  val formats = for {
-    log <- rawCLFs
-    format = log.request.get("format") match {
-      case Some(format) => format
-      case _ => ""
-    }
-  } yield format
+    println("Content Type Statistics");
+    val formats = for {
+      log <- rawCLFs
+      format = log.request.get("format") match {
+        case Some(format) => format
+        case _ => ""
+      }
+    } yield format
 
-  val formatDistribution = formats.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => (f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / formats.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
+    val formatDistribution = formats.groupBy(l => l).map(t => (t._1, t._2.length))
+      .toList.sortBy({ _._2 }).map(f => (f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / formats.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
-  writeOutputToFile("Distribtion of Content Type of Access Log Entries", formatDistribution.+:(("Content Type", "Abs. Number", "Rel. Number")).slice(0, 11))
+    writeOutputToFile("Distribtion of Content Type of Access Log Entries", formatDistribution.+:(("Content Type", "Abs. Number", "Rel. Number")).slice(0, 11))
 
-  /*
+    /*
    * SPARQL Query-type break down
    */
-  println("SPARQL Query-type break down");
-  val successQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> false))
-    //    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
-    //    .skip(1)
-    //    .limit(613)
-    .toList
+    println("SPARQL Query-type break down");
+    val successQueriesQ = SparqlQueries.filter(q => q.containsErrors === "false").length
+    val successQueries = successQueriesQ.run
+    //      SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> false))
+    //      //    .sort(orderBy = MongoDBObject("_id" -> -1)) // sort by _id desc
+    //      //    .skip(1)
+    //      //    .limit(613)
+    //      .toList
 
-  val selectQueries = successQueries.filter(q => q.query.contains("SELECT"))
-  val describeQueries = successQueries.filter(q => q.query.contains("DESCRIBE")).size
-  val askQueries = successQueries.filter(q => q.query.contains("ASK")).size
-  val constructQueries = successQueries.filter(q => q.query.contains("CONSTRUCT")).size
-  val errorQueries = SparqlQueryDAO.find(ref = MongoDBObject("containsErrors" -> true)).count
+    val selectQueriesQ = SparqlQueries.filter(q => (q.containsErrors === "false") && (q.query like ("%SELECT%"))).length
+    val selectQueries = selectQueriesQ.run
+    val describeQueries = SparqlQueries.filter(q => (q.containsErrors === "false") && (q.query like ("%DESCRIBE%"))).length.run
+    val askQueries = SparqlQueries.filter(q => (q.containsErrors === "false") && (q.query like ("%ASK%"))).length.run
+    val constructQueries = SparqlQueries.filter(q => (q.containsErrors === "false") && (q.query like ("%CONSTRUCT%"))).length.run
+    val errorQueries = SparqlQueries.filter(q => (q.containsErrors === "true")).length.run
 
-  val queryBreakDown = List(
-    ("Type", "Abs. Number", "Rel. Number"),
-    ("SELECT", "" + selectQueries.size, "" + BigDecimal(selectQueries.size.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
-    ("DESCRIBE", "" + describeQueries, "" + BigDecimal(describeQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
-    ("CONSTRUCT", "" + constructQueries, "" + BigDecimal(constructQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
-    ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
-    ("error", "" + errorQueries, "" + BigDecimal(errorQueries.toFloat / (errorQueries + successQueries.size)).setScale(2, BigDecimal.RoundingMode.HALF_UP)))
+    val queryBreakDown = List(
+      ("Type", "Abs. Number", "Rel. Number"),
+      ("SELECT", "" + selectQueries, "" + BigDecimal(selectQueries.toFloat / (errorQueries + successQueries)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+      ("DESCRIBE", "" + describeQueries, "" + BigDecimal(describeQueries.toFloat / (errorQueries + successQueries)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+      ("CONSTRUCT", "" + constructQueries, "" + BigDecimal(constructQueries.toFloat / (errorQueries + successQueries)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+      ("ASK", "" + askQueries, "" + BigDecimal(askQueries.toFloat / (errorQueries + successQueries)).setScale(2, BigDecimal.RoundingMode.HALF_UP)),
+      ("error", "" + errorQueries, "" + BigDecimal(errorQueries.toFloat / (errorQueries + successQueries)).setScale(2, BigDecimal.RoundingMode.HALF_UP)))
 
-  writeOutputToFile("SPARQL query break down", queryBreakDown)
+    writeOutputToFile("SPARQL query break down", queryBreakDown)
 
-  /*
+    /*
    * SELECT queries with N triple pattern
    */
-  println("SELECT queries with N triple pattern");
-  val simpleTriples = //try {
-    SimpleTripleDAO.find(ref = MongoDBObject()).toList
-  //  } catch {
-  //    case e: Exception => List()
-  //  }
+    println("SELECT queries with N triple pattern");
+    //    val simpleTriples = (for {
+    //      q <- SparqlQueries if q.id inSetBind selectQueries.map(_.id)
+    //      t <- SimpleTriples if t.queryId === q.id
+    //    } yield (q, t)).groupBy(_._1.id)
+    //
+    //    val queryTripleOccurrences = simpleTriples.map {
+    //      case (queryId, triples) =>
+    //        (queryId, triples.length)
+    //    }.list
 
-  val queryTripleOccurrences = for {
-    // zipwithIndex returns no of current iteration
-    (query, index) <- selectQueries.zipWithIndex
-    triples = {
-      simpleTriples.filter(_.queryId == query._id)
+    val simpleTriples = (for {
+      q <- SparqlQueries if q.query like ("%SELECT%") // inSetBind selectQueries.map(_.id)
+      t <- SimpleTriples if t.queryId === q.id
+    } yield (q.id, t)).list
+
+    val queryTripleOccurrences = {
+      val groupedTriples = simpleTriples.groupBy(_._1).toList
+      groupedTriples.map(gp => {
+        (gp._1, gp._2.map(_._2), gp._2.size)
+      })
     }
-    n = triples.size
-    printer = println(index)
-  } yield {
-   
-    (query, triples, n)
-  }
 
-  val noOfTriples = queryTripleOccurrences.map(_._3)
+    //      
+    //      for {
+    //      // zipwithIndex returns no of current iteration
+    //      (query, index) <- selectQueries.zipWithIndex
+    //      triples = {
+    //        simpleTriples.filter(_.queryId == query._id)
+    //      }
+    //      n = triples.size
+    //      printer = println(index)
+    //    } yield {
+    //
+    //      (query, triples, n)
+    //    }
 
-  val tripleDistribution = noOfTriples.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / noOfTriples.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
+    val noOfTriples = queryTripleOccurrences.map(_._2)
 
-  writeOutputToFile("SELECT queries with N triple pattern", tripleDistribution.+:(("N", "Abs. Number", "Rel. Number")).slice(0, 11))
+    val tripleDistribution = noOfTriples.groupBy(l => l).map(t => (t._1, t._2.length))
+      .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / noOfTriples.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
-  /*
-   * Main Query-pattern types (1-pattern queries only)
+    writeOutputToFile("SELECT queries with N triple patterns", tripleDistribution.+:(("N", "Abs. Number", "Rel. Number")).slice(0, 11))
+
+    /*
+   * Main Triple-pattern types
    */
-  println("Main Query-pattern types (1-pattern queries only)");
-  val onePatternTriples = queryTripleOccurrences.filter(q => q._3 == 1).map(q => q._2)
+    println("Main Triple-pattern types");
+    val allPatternTriples = queryTripleOccurrences.map(q => q._2)
 
-  val patternTypes = for {
-    query <- onePatternTriples.flatten
-  } yield "(" + query.sub_type + "," + query.pred_type + "," + query.obj_type + ")"
+    val patternTypes = for {
+      triple <- allPatternTriples.flatten
+    } yield "(" + triple.subjType.get + "," + triple.predType.get + "," + triple.objType.get + ")"
 
-  val patternDistribution = patternTypes.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
+    val patternDistribution = patternTypes.groupBy(l => l).map(t => (t._1, t._2.length))
+      .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
-  writeOutputToFile("Main query pattern types", patternDistribution.+:(("Pattern", "Abs. Number", "Rel. Number")).slice(0, 11))
+    writeOutputToFile("Main triple pattern types", patternDistribution.+:(("Pattern", "Abs. Number", "Rel. Number")).slice(0, 11))
 
-  /*
+    /*
    * Predicates used in 1-pattern queries
    */
-  println("Predicates used in 1-pattern queries");
-  val predicateTypes = for {
-    query <- onePatternTriples.flatten
-    cleanedquery = query if query.pred_type != "var" && query.pred_type != "blank" && query.pred_type != "-"
-  } yield "<" + cleanedquery.pred_pref + cleanedquery.pred_prop + ">"
+    //    println("Predicates used in 1-pattern queries");
+    //    val predicateTypes = for {
+    //      query <- onePatternTriples.flatten
+    //      cleanedquery = query if query.pred_type != "var" && query.pred_type != "blank" && query.pred_type != "-"
+    //    } yield "<" + cleanedquery.pred_pref + cleanedquery.pred_prop + ">"
+    //
+    //    val predicateDistribution = predicateTypes.groupBy(l => l).map(t => (t._1, t._2.length))
+    //      .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
+    //
+    //    writeOutputToFile("Predicates used in 1-pattern queries", predicateDistribution.+:(("Predicate", "Abs. Number", "Rel. Number")).slice(0, 11))
 
-  val predicateDistribution = predicateTypes.groupBy(l => l).map(t => (t._1, t._2.length))
-    .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
-
-  writeOutputToFile("Predicates used in 1-pattern queries", predicateDistribution.+:(("Predicate", "Abs. Number", "Rel. Number")).slice(0, 11))
+    csvPrinter.close
+  }
 
   /*  
    *  Anonymous function to write data to the open csv file
@@ -187,26 +213,7 @@ object StatisticController extends App {
     }
     csvPrinter.println
     csvPrinter.flush
-    println("Wrote to file.");    
+    println("Wrote to file.");
   }
 
-  //		// generate CSVPrinter Object
-  //		// FileOutputStream csvBAOS = new FileOutputStream(new File(path));
-  //		BufferedWriter writer = new BufferedWriter(new FileWriter(
-  //				new File(path)));
-  //		// OutputStreamWriter csvWriter = new OutputStreamWriter(csvBAOS);
-  //		CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);
-  //
-  //		csvPrinter.print("sep=,");
-  //		csvPrinter.println();
-  //
-  //		for (String key:data.keySet()) {
-  //			csvPrinter.print(key);
-  //			csvPrinter.print(data.get(key));
-  //			csvPrinter.println();
-  //		}
-  //
-  //		
-  //		
-  csvPrinter.close
 }
