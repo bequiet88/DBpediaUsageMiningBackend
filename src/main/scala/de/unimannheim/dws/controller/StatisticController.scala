@@ -22,6 +22,7 @@ import de.unimannheim.dws.models.postgre.DbConn
 import de.unimannheim.dws.models.postgre.Tables._
 import scala.slick.driver.PostgresDriver.simple._
 import scala.slick.driver.JdbcDriver.backend.Database
+import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
 
 // http://notes.3kbo.com/scala
 
@@ -107,27 +108,38 @@ object StatisticController extends App {
    * SELECT queries with N triple pattern
    */
     println("SELECT queries with N triple pattern");
-    //    val simpleTriples = (for {
-    //      q <- SparqlQueries if q.id inSetBind selectQueries.map(_.id)
-    //      t <- SimpleTriples if t.queryId === q.id
-    //    } yield (q, t)).groupBy(_._1.id)
-    //
-    //    val queryTripleOccurrences = simpleTriples.map {
-    //      case (queryId, triples) =>
-    //        (queryId, triples.length)
-    //    }.list
+        val simpleTriples = (for {
+          q <- SparqlQueries if q.query like ("%SELECT%")
+          t <- SimpleTriples if t.queryId === q.id
+        } yield (q, t)).groupBy(_._1.id)
+    
+        val queryTripleOccurrences = simpleTriples.map {
+          case (queryId, triples) =>
+            (queryId, triples.length)
+        }.list
 
-    val simpleTriples = (for {
-      q <- SparqlQueries if q.query like ("%SELECT%") // inSetBind selectQueries.map(_.id)
-      t <- SimpleTriples if t.queryId === q.id
-    } yield (q.id, t)).list
+//    val queryTripleOccurrencesQ = (for {
+//      q <- SparqlQueries if q.query like ("%SELECT%") // inSetBind selectQueries.map(_.id)
+//      t <- SimpleTriples if t.queryId === q.id
+//    } yield (q.id, t))
+//
+//    println(queryTripleOccurrencesQ.selectStatement);
+//
+//    val queryTripleOccurrences = queryTripleOccurrencesQ.foldLeft(Map[(Long), (List[SimpleTriplesRow], Int)]())((i, row) => {
+//
+//      if (i.contains(row._1)) {
+//        i + (((row._1), (i(row._1)._1 :+ row._2, i(row._1)._2 + 1)))
+//      } else {
+//        i + (((row._1), (List(row._2), 1)))
+//      }
+//    })
 
-    val queryTripleOccurrences = {
-      val groupedTriples = simpleTriples.groupBy(_._1).toList
-      groupedTriples.map(gp => {
-        (gp._1, gp._2.map(_._2), gp._2.size)
-      })
-    }
+    //    val queryTripleOccurrences = {
+    //      val groupedTriples = simpleTriples.groupBy(_._1).toList
+    //      groupedTriples.map(gp => {
+    //        (gp._1, gp._2.map(_._2), gp._2.size)
+    //      })
+    //    }
 
     //      
     //      for {
@@ -154,14 +166,18 @@ object StatisticController extends App {
    * Main Triple-pattern types
    */
     println("Main Triple-pattern types");
-    val allPatternTriples = queryTripleOccurrences.map(q => q._2)
+        
+    val queryTripleTypes =  Q.queryNA[(String, String, String)]("select s57.subj_type, s57.pred_type, s57.obj_type from sparql_queries s55, simple_triples s57 where (s55.query like '%SELECT%') and s57.query_id = s55.id").list   
+//    val allPatternTriples =  (for {
+//      (key, value) <- queryTripleOccurrences
+//    } yield { value._1 }).asInstanceOf[List[List[SimpleTriplesRow]]]
+//
+//    val patternTypes = (for {
+//      triple <- allPatternTriples.flatten
+//    } yield "(" + triple.subjType.get + "," + triple.predType.get + "," + triple.objType.get + ")")
 
-    val patternTypes = for {
-      triple <- allPatternTriples.flatten
-    } yield "(" + triple.subjType.get + "," + triple.predType.get + "," + triple.objType.get + ")"
-
-    val patternDistribution = patternTypes.groupBy(l => l).map(t => (t._1, t._2.length))
-      .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / patternTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
+    val patternDistribution = queryTripleTypes.groupBy(l => l).map(t => (t._1, t._2.length))
+      .toList.sortBy({ _._2 }).map(f => ("" + f._1, "" + f._2, "" + BigDecimal(f._2.toFloat / queryTripleTypes.size).setScale(2, BigDecimal.RoundingMode.HALF_UP))).reverse
 
     writeOutputToFile("Main triple pattern types", patternDistribution.+:(("Pattern", "Abs. Number", "Rel. Number")).slice(0, 11))
 
