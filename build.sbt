@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
   "org.apache.jena" 		% "jena-iri" 	 				 % "1.0.0" withSources,
   "org.apache.jena" 		% "jena-tdb" 	 				 % "1.0.0" withSources,
   "com.typesafe.slick" 		%% "slick" 		 				 % "2.0.1" withSources,
-  "postgresql"              %  "postgresql"                  % "9.1-901-1.jdbc4" withSources
+  "postgresql"              %  "postgresql"                  % "9.1-901-1.jdbc4" withSources,
+  "nz.ac.waikato.cms.weka" 	% "weka-stable" 				 % "3.6.6"
 )
 
 scalacOptions in Test ++= Seq("-Yrangepos")
