@@ -3,18 +3,26 @@ package de.unimannheim.dws.algorithms
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
+import java.util.HashMap
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.StringBuilder
 import scala.slick.driver.JdbcDriver.backend.Database
 import scala.slick.driver.PostgresDriver.simple._
 import scala.slick.jdbc.GetResult
 import scala.slick.jdbc.{ StaticQuery => Q }
-import scala.collection.mutable.StringBuilder
 
 import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.Util
 
-object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)] {
+import weka.core.Attribute
+import weka.core.FastVector
+import weka.core.Instance
+import weka.core.Instances
+import weka.clusterers.DBSCAN
+import weka.clusterers.ClusterEvaluation
+
+object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, Double)] {
 
   /**
    * Method to generate property pairs with their number of hits
@@ -78,6 +86,73 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)]
    */
   def retrieve(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
+    // Calculate the distance matrix of given triples and Integer-URL-Resolver
+    val distanceMatrix = calculateDistanceMatrix(triples)
+
+    // Pushes the Distance Matrix to the Interoperability Class
+    DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
+
+    /*
+     * Instantiate WEKA, see 
+     * - http://weka.wikispaces.com/Creating+an+ARFF+file
+     * - http://weka.wikispaces.com/Use+Weka+in+your+Java+code#Clustering
+     */
+    // 1. set up attributes
+    var atts: FastVector = new FastVector()
+    // - string
+    atts.addElement(new Attribute("att1"))
+    // 2. create Instances object
+    var data: Instances = new Instances("clusterGrouper", atts, 0);
+
+    // 3. fill with data
+    for {
+      i <- 0 to distanceMatrix._2.size
+    } yield {
+      var vals: Array[Double] = new Array[Double](data.numAttributes())
+      vals(0) = i
+      data.add(new Instance(1.0, vals))
+    }
+
+    // 4. instantiate clusterer
+    var options: Array[String] = new Array[String](6)
+    options(0) = "-E"; // epsilon
+    options(1) = "0.2"
+    options(2) = "-D"; // distance function
+    options(3) = "de.unimannheim.dws.algorithms.CustomDBSCANDataObject"
+    options(4) = "-M"; // epsilon
+    options(5) = "10"
+    var clusterer: DBSCAN = new DBSCAN() // new instance of clusterer
+    clusterer.setOptions(options) // set the options
+    clusterer.buildClusterer(data) // build the clusterer
+    
+    clusterer.getOptions().foreach(p => println(p))
+
+    // 5. iterate with instances over cluster
+    val resList = (for {
+      i <- 0 to data.numInstances()
+    } yield {
+      var cluster = "noise"
+      try {
+        cluster = clusterer.clusterInstance(data.instance(i)).toString
+      } catch {
+        case t: Exception => // todo: handle error
+      }
+      val propLabel = distanceMatrix._2.get(i).getOrElse("")
+      val support = {
+        val filteredProp = distanceMatrix._3.filter(p => (p.prefix.get + p.property.get).equals(propLabel))
+        filteredProp.headOption match {
+          case p: Some[PropertiesUniqueRow] => p.get.support.get
+          case _ => 0D
+        }
+      }
+      (propLabel, cluster, support)
+    }).toList
+
+    resList.filter(r => !r._1.equals("")).sortBy(r => (r._2, r._3))
+  }
+
+  def calculateDistanceMatrix(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow]) = {
+
     val properties = triples.map(_._2).removeDuplicates
 
     println("Unique Properties generated from TripleList: " + properties.size)
@@ -99,12 +174,14 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)]
       else i.append(",'" + row + "'")
     })
 
-
     // List of Pairs found on DB with a count assigned to them
     val propPairWeightList = Q.queryNA[PairCounterRow]("select prop_1_id, prop_2_id, count from pair_counter where prop_1_id in (" + pairString.toString + ") and prop_2_id in (" + pairString.toString + ")")
       .list
 
     println("Pairs read from DB: " + propPairWeightList.size)
+
+    // List of Support of single properties from Triple List
+    val propertyList = Q.queryNA[PropertiesUniqueRow]("select * from properties_unique where id in (" + pairString.toString + ")").list
 
     // Two collections: 1.) Map with two integer indexes as key and the count as value. 2.) List of unprocessed prop pairs 
     val propPairWeightUniqueLists = propPairWeightList.foldLeft((Map[(Int, Int), Double](), propPairWeightList))((i, row) => {
@@ -156,9 +233,12 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)]
       })
       i ++ tempPropMatrix
     })
+    (propertyMatrix, propertyIdMaps._1, propertyList)
+  }
+
+  def printDistanceMatrix(propertyMatrix: List[(Int, Int, Double)]) = {
 
     println("Pairs about to be written to file: " + propertyMatrix.size)
-
     // Print the Distance Matrix as required by ELKI 
     val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix.ascii");
     file.getParentFile().mkdirs();
@@ -173,7 +253,26 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, Double)]
     })
     out.flush()
     out.close()
-
-    List()
   }
+
+  def convertDistanceMatrixToWeka(distancesList: List[(Int, Int, Double)]): Map[(Integer, Integer), java.math.BigDecimal] = {
+
+    distancesList.foldLeft(Map[(Integer, Integer), java.math.BigDecimal]())((i, row) => {
+
+      i + (((row._1, row._2), new java.math.BigDecimal(row._3)))
+
+      //      if(i.containsKey(row._1)) {
+      //        i.get(row._1).put(row._2, new java.math.BigDecimal(row._3))
+      //        i        
+      //      }
+      //      else {
+      //        val newMap: HashMap[Integer, java.math.BigDecimal] = new HashMap()
+      //        newMap.put(row._2, new java.math.BigDecimal(row._3))
+      //        i.put(row._1, newMap)
+      //        i
+      //      }
+    })
+
+  }
+
 }

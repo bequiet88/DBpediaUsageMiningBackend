@@ -11,7 +11,7 @@ import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
 import de.unimannheim.dws.preprocessing.Util
 
-object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, Double] {
+object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, Double)] {
 
   /**
    * Method to generate class property pairs with their number of hits
