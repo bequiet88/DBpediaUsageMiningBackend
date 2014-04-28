@@ -4,23 +4,21 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 import java.util.HashMap
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable.StringBuilder
 import scala.slick.driver.JdbcDriver.backend.Database
 import scala.slick.driver.PostgresDriver.simple._
 import scala.slick.jdbc.GetResult
 import scala.slick.jdbc.{ StaticQuery => Q }
-
 import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.Util
-
 import weka.core.Attribute
 import weka.core.FastVector
 import weka.core.Instance
 import weka.core.Instances
 import weka.clusterers.DBSCAN
 import weka.clusterers.ClusterEvaluation
+import weka.clusterers.AbstractClusterer
 
 object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, Double)] {
 
@@ -114,18 +112,10 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     }
 
     // 4. instantiate clusterer
-    var options: Array[String] = new Array[String](6)
-    options(0) = "-E"; // epsilon
-    options(1) = "0.2"
-    options(2) = "-D"; // distance function
-    options(3) = "de.unimannheim.dws.algorithms.CustomDBSCANDataObject"
-    options(4) = "-M"; // epsilon
-    options(5) = "10"
-    var clusterer: DBSCAN = new DBSCAN() // new instance of clusterer
-    clusterer.setOptions(options) // set the options
+    var clusterer = getClusterer("CustomKMeans")
     clusterer.buildClusterer(data) // build the clusterer
     
-    clusterer.getOptions().foreach(p => println(p))
+    println("# of clusters: "+ clusterer.numberOfClusters())
 
     // 5. iterate with instances over cluster
     val resList = (for {
@@ -215,7 +205,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     })
 
     println("Unique pairs read from DB: " + propPairWeightUniqueLists._1.size)
-    propPairWeightUniqueLists._1.foreach(p => println(propertyIdMaps._1.get(p._1._1) + " " + propertyIdMaps._1.get(p._1._2) + " " + p._2))
+//    propPairWeightUniqueLists._1.foreach(p => println(propertyIdMaps._1.get(p._1._1) + " " + propertyIdMaps._1.get(p._1._2) + " " + p._2))
 
     // Generate the Distance matrix of all prop pairs with a distance assigned to them
     val propertyMatrix = propertyIntIdsList.foldLeft(List[(Int, Int, Double)]())((i, id) => {
@@ -273,6 +263,42 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
       //      }
     })
 
+  }
+
+  def getClusterer(clusterAlgo: String): AbstractClusterer = {
+
+    clusterAlgo match {
+      case "DBSCAN" => {
+        var options: Array[String] = new Array[String](6)
+        options(0) = "-E"; // epsilon
+        options(1) = "0.2"
+        options(2) = "-D"; // distance function
+        options(3) = "de.unimannheim.dws.algorithms.CustomDBSCANDataObject"
+        options(4) = "-M"; // epsilon
+        options(5) = "10"
+        var clusterer: DBSCAN = new DBSCAN() // new instance of clusterer
+        clusterer.setOptions(options) // set the options
+        println(clusterAlgo);
+        clusterer.getOptions().foreach(p => println(p))
+        clusterer
+      }
+      case "CustomKMeans" => {
+        var options: Array[String] = new Array[String](8)
+        options(0) = "-N"; // number of clusters
+        options(1) = "7"
+        options(2) = "-A"; // distance function
+        options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
+        options(4) = "-M"; // Replace missing values with mean/mode.
+        options(5) = "-I"  // Maximum iterations
+        options(6) = "100"
+        options(7) = "-O"  // Preserve order of instances.  
+        var clusterer: CustomSimpleKMeans = new CustomSimpleKMeans() // new instance of clusterer
+        clusterer.setOptions(options) // set the options
+        println(clusterAlgo);
+        clusterer.getOptions().foreach(p => println(p))
+        clusterer
+      }
+    }
   }
 
 }
