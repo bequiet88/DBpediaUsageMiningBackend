@@ -3,22 +3,25 @@ package de.unimannheim.dws.algorithms
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import java.util.HashMap
-import scala.collection.JavaConverters._
+
 import scala.collection.mutable.StringBuilder
-import scala.slick.driver.JdbcDriver.backend.Database
-import scala.slick.driver.PostgresDriver.simple._
-import scala.slick.jdbc.GetResult
-import scala.slick.jdbc.{ StaticQuery => Q }
-import de.unimannheim.dws.models.postgre.Tables._
+import scala.slick.driver.PostgresDriver.simple.optionColumnExtensionMethods
+import scala.slick.driver.PostgresDriver.simple.queryToAppliedQueryInvoker
+import scala.slick.jdbc.{StaticQuery => Q}
+
+import de.unimannheim.dws.models.postgre.Tables.GetResultPairCounterRow
+import de.unimannheim.dws.models.postgre.Tables.GetResultPropertiesUniqueRow
+import de.unimannheim.dws.models.postgre.Tables.PairCounterRow
+import de.unimannheim.dws.models.postgre.Tables.PropertiesUniqueRow
+import de.unimannheim.dws.models.postgre.Tables.PropertyAnalytics
 import de.unimannheim.dws.preprocessing.Util
+import weka.clusterers.AbstractClusterer
+import weka.clusterers.DBSCAN
+import weka.clusterers.HierarchicalClusterer
 import weka.core.Attribute
 import weka.core.FastVector
 import weka.core.Instance
 import weka.core.Instances
-import weka.clusterers.DBSCAN
-import weka.clusterers.ClusterEvaluation
-import weka.clusterers.AbstractClusterer
 
 object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, Double)] {
 
@@ -87,6 +90,9 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     // Calculate the distance matrix of given triples and Integer-URL-Resolver
     val distanceMatrix = calculateDistanceMatrix(triples)
 
+    // Prints a Pajek compatible net
+    printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
+    
     // Pushes the Distance Matrix to the Interoperability Class
     DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
 
@@ -112,10 +118,11 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     }
 
     // 4. instantiate clusterer
-    var clusterer = getClusterer("CustomKMeans")
+    var clusterer = getClusterer("CustomKMedoids")
     clusterer.buildClusterer(data) // build the clusterer
-    
-    println("# of clusters: "+ clusterer.numberOfClusters())
+    println(clusterer.toString)
+
+    println("# of clusters: " + clusterer.numberOfClusters())
 
     // 5. iterate with instances over cluster
     val resList = (for {
@@ -138,10 +145,10 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
       (propLabel, cluster, support)
     }).toList
 
-    resList.filter(r => !r._1.equals("")).sortBy(r => (r._2, r._3))
+    resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse
   }
 
-  def calculateDistanceMatrix(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow]) = {
+  def calculateDistanceMatrix(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow],List[(Int, Int, Double)]) = {
 
     val properties = triples.map(_._2).removeDuplicates
 
@@ -205,10 +212,10 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     })
 
     println("Unique pairs read from DB: " + propPairWeightUniqueLists._1.size)
-//    propPairWeightUniqueLists._1.foreach(p => println(propertyIdMaps._1.get(p._1._1) + " " + propertyIdMaps._1.get(p._1._2) + " " + p._2))
+    //    propPairWeightUniqueLists._1.foreach(p => println(propertyIdMaps._1.get(p._1._1) + " " + propertyIdMaps._1.get(p._1._2) + " " + p._2))
 
     // Generate the Distance matrix of all prop pairs with a distance assigned to them
-    val propertyMatrix = propertyIntIdsList.foldLeft(List[(Int, Int, Double)]())((i, id) => {
+    val propertyDistanceMatrix = propertyIntIdsList.foldLeft(List[(Int, Int, Double)]())((i, id) => {
 
       // inner loop to iterate only over all pairs (ab/ba) once
       val listInnerLoop = propertyIntIdsList.slice(id, propertyIntIdsList.size)
@@ -223,7 +230,21 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
       })
       i ++ tempPropMatrix
     })
-    (propertyMatrix, propertyIdMaps._1, propertyList)
+
+    val propertyCountMatrix = propertyIntIdsList.foldLeft(List[(Int, Int, Double)]())((i, id) => {
+
+      // inner loop to iterate only over all pairs (ab/ba) once
+      val listInnerLoop = propertyIntIdsList.slice(id, propertyIntIdsList.size)
+
+      val tempPropMatrix = listInnerLoop.map(subId => {
+        val count = propPairWeightUniqueLists._1.getOrElse((id, subId), 0D)
+
+        (id, subId, count)
+      })
+      i ++ tempPropMatrix
+    })
+
+    (propertyDistanceMatrix, propertyIdMaps._1, propertyList, propertyCountMatrix)
   }
 
   def printDistanceMatrix(propertyMatrix: List[(Int, Int, Double)]) = {
@@ -240,6 +261,36 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     propertyMatrix.map(p => {
       out.write(p._1 + " " + p._2 + " " + p._3)
       if (!p.eq(last)) out.newLine()
+    })
+    out.flush()
+    out.close()
+  }
+
+  def printDistanceMatrixAsNet(label:String, mapIdProp: Map[Int,String], propertyMatrix: List[(Int, Int, Double)]) = {
+
+//    println("Pairs about to be written to file: " + propertyMatrix.size)
+    // Print the Distance Matrix as required by Pajek
+    val printLabel = label.split("/").last
+    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix_"+printLabel+".net");
+    file.getParentFile().mkdirs();
+
+    val out: BufferedWriter = new BufferedWriter(new FileWriter(file));
+
+    // Write Vertices
+    out.write("*Vertices "+mapIdProp.size)
+    out.newLine()
+    val listIdProp = mapIdProp.toList.sortBy(_._1)
+    listIdProp.foreach((k) => {
+      out.write(k._1+1 +" \""+k._2+"\"")
+      out.newLine()
+    })
+    // Write Edges
+    out.write("*Edges :2 \"QueriedTogether\"")
+    out.newLine()
+    val lastEdge = propertyMatrix.reverse.head
+    propertyMatrix.map(p => {
+      out.write((p._1+1) + " " + (p._2+1) + " " + p._3.toInt)
+      if (!p.eq(lastEdge)) out.newLine()
     })
     out.flush()
     out.close()
@@ -271,28 +322,70 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
       case "DBSCAN" => {
         var options: Array[String] = new Array[String](6)
         options(0) = "-E"; // epsilon
-        options(1) = "0.2"
+        options(1) = "0.1"
         options(2) = "-D"; // distance function
         options(3) = "de.unimannheim.dws.algorithms.CustomDBSCANDataObject"
-        options(4) = "-M"; // epsilon
-        options(5) = "10"
+        options(4) = "-M"; // mintpts
+        options(5) = "4"
         var clusterer: DBSCAN = new DBSCAN() // new instance of clusterer
         clusterer.setOptions(options) // set the options
         println(clusterAlgo);
         clusterer.getOptions().foreach(p => println(p))
         clusterer
       }
-      case "CustomKMeans" => {
+      case "CustomKMedian" => {
         var options: Array[String] = new Array[String](8)
         options(0) = "-N"; // number of clusters
         options(1) = "7"
         options(2) = "-A"; // distance function
         options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
-        options(4) = "-M"; // Replace missing values with mean/mode.
-        options(5) = "-I"  // Maximum iterations
-        options(6) = "100"
-        options(7) = "-O"  // Preserve order of instances.  
-        var clusterer: CustomSimpleKMeans = new CustomSimpleKMeans() // new instance of clusterer
+        options(4) = "-I" // Maximum iterations
+        options(5) = "100"
+        //        options(6) = "-S" // Random number seed.
+        //        options(7) = "908349"
+        //        options(8) = "-output-debug-info"
+        //        options(9) = "-init"
+        //        options(10) = "1"
+        options(6) = "-M"; // Replace missing values with mean/mode.
+        options(7) = "-O" // Preserve order of instances.  
+        var clusterer: CustomSimpleKMedian = new CustomSimpleKMedian() // new instance of clusterer
+        clusterer.setOptions(options) // set the options
+        println(clusterAlgo);
+        clusterer.getOptions().foreach(p => println(p))
+        clusterer
+      }
+      case "CustomKMedoids" => {
+        var options: Array[String] = new Array[String](8)
+        options(0) = "-N"; // number of clusters
+        options(1) = "7"
+        options(2) = "-A"; // distance function
+        options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
+        options(4) = "-I" // Maximum iterations
+        options(5) = "100"
+        //        options(6) = "-S" // Random number seed.
+        //        options(7) = "908349"
+        //        options(8) = "-output-debug-info"
+        //        options(9) = "-init"
+        //        options(10) = "1"
+        options(6) = "-M"; // Replace missing values with mean/mode.
+        options(7) = "-O" // Preserve order of instances.  
+        var clusterer: CustomSimpleKMedoids = new CustomSimpleKMedoids() // new instance of clusterer
+        clusterer.setOptions(options) // set the options
+        println(clusterAlgo);
+        clusterer.getOptions().foreach(p => println(p))
+        clusterer
+      }
+      case "HierarchicalClusterer" => {
+        var options: Array[String] = new Array[String](7)
+        options(0) = "-N"; // # of clusters
+        options(1) = "7"
+        options(2) = "-A"; // distance function
+        options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
+        options(4) = "-L"; // Link type
+        options(5) = "CENTROID"
+        options(6) = "-P"  
+//                options(7) = "-B" // If set, distance is interpreted as branch length, otherwise it is node height.  
+        var clusterer: HierarchicalClusterer = new HierarchicalClusterer() // new instance of clusterer
         clusterer.setOptions(options) // set the options
         println(clusterAlgo);
         clusterer.getOptions().foreach(p => println(p))

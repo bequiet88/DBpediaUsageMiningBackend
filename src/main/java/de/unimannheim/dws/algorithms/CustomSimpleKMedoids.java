@@ -103,7 +103,7 @@ import weka.filters.unsupervised.attribute.ReplaceMissingValues;
  * @see RandomizableClusterer
  */
 
-public class CustomSimpleKMeans extends RandomizableClusterer implements
+public class CustomSimpleKMedoids extends RandomizableClusterer implements
 	  NumberOfClustersRequestable, WeightedInstancesHandler {
 
 	  /** for serialization */
@@ -193,7 +193,7 @@ public class CustomSimpleKMeans extends RandomizableClusterer implements
 	  /**
 	   * the default constructor
 	   */
-	  public CustomSimpleKMeans() {
+	  public CustomSimpleKMedoids() {
 	    super();
 
 	    m_SeedDefault = 10;
@@ -431,42 +431,32 @@ public class CustomSimpleKMeans extends RandomizableClusterer implements
 	  protected double[] moveCentroid(int centroidIndex, Instances members,
 	    boolean updateClusterInfo) {
 	    double[] vals = new double[members.numAttributes()];
-
-	    // used only for Manhattan Distance
-	    Instances sortedMembers = null;
-	    int middle = 0;
-	    boolean dataIsEven = false;
-
-	    if (m_DistanceFunction instanceof ManhattanDistance || m_DistanceFunction instanceof CustomPairWiseDistance) {
-	      middle = (members.numInstances() - 1) / 2;
-	      dataIsEven = ((members.numInstances() % 2) == 0);
-	      if (m_PreserveOrder) {
-	        sortedMembers = members;
-	      } else {
-	        sortedMembers = new Instances(members);
-	      }
+	    
+	    if(!updateClusterInfo) {
+	    	vals[0] = 100D;
+	    	return vals;
 	    }
 
+	    double smallestError = Double.MAX_VALUE;
+	    Instance currentCentroid = null;
+	    
 	    for (int j = 0; j < members.numAttributes(); j++) {
+	    	
+	    	Instance currentInstance = members.instance(j);
+	    	double distanceError = 0D;
+	    	for(int i =0; i < members.numAttributes(); i++) {
+	    		distanceError += m_DistanceFunction.distance(currentInstance, members.instance(j));
+	    	}
+	    	if(distanceError<smallestError) {
+	    		smallestError = distanceError;
+	    		currentCentroid = currentInstance;
+	    	}	    	
+	    }
+	    
+	    vals[0] = currentCentroid.valueSparse(0);
+	    
 
-	      // in case of Euclidian distance the centroid is the mean point
-	      // in case of Manhattan distance the centroid is the median point
-	      // in both cases, if the attribute is nominal, the centroid is the mode
-	      if (m_DistanceFunction instanceof EuclideanDistance
-	        || members.attribute(j).isNominal()) {
-	        vals[j] = members.meanOrMode(j);
-	      } else if (m_DistanceFunction instanceof ManhattanDistance || m_DistanceFunction instanceof CustomPairWiseDistance) {
-	        // singleton special case
-	        if (members.numInstances() == 1) {
-	          vals[j] = members.instance(0).value(j);
-	        } else {
-	          vals[j] = sortedMembers.kthSmallestValue(j, middle + 1);
-	          if (dataIsEven) {
-	            vals[j] = (vals[j] + sortedMembers.kthSmallestValue(j, middle + 2)) / 2;
-	          }
-	        }
-	      }
-
+	    for (int j = 0; j < members.numAttributes(); j++) {
 	      if (updateClusterInfo) {
 	        m_ClusterMissingCounts[centroidIndex][j] = members.attributeStats(j).missingCount;
 	        m_ClusterNominalCounts[centroidIndex][j] = members.attributeStats(j).nominalCounts;
@@ -483,6 +473,7 @@ public class CustomSimpleKMeans extends RandomizableClusterer implements
 	        }
 	      }
 	    }
+	    
 	    if (updateClusterInfo) {
 	      m_ClusterCentroids.add(new Instance(1.0, vals));
 	    }
