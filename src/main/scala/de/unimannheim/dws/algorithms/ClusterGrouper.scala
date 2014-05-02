@@ -89,14 +89,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
     val triplesFiltered = {
       if (options.contains("-L")) {
-
-        val index = options.indexOf("-L") + 1
-
-        options(index) match {
-          case "true" => triples.filter(t => t._3.startsWith("http"))
-          case "false" => triples
-          case _ => triples
-        }
+        triples.filter(t => t._3.startsWith("http"))
       } else triples
     }
 
@@ -131,7 +124,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     }
 
     // 4. instantiate clusterer
-    var clusterer = getClusterer("CustomKMedoids")
+    var clusterer = getClusterer("DBSCAN")
     clusterer.buildClusterer(data) // build the clusterer
     println(clusterer.toString)
 
@@ -179,31 +172,53 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
      * 9. Generate distance matrix
      * 10. Generate distance count matrix
      */
-    
-    
-    
-    // Generate temporary Maps mapping 1.) Integer Index to URI 2.) MD5 to Integer Index
-    val propertyIdMaps = properties.zipWithIndex.foldLeft((Map[Int, String](), Map[String, Int]())) { (i, t) =>
+    val propertyIdMap = properties.foldLeft((Map[String, String]())) { (i, t) =>
       {
-        val id = Util.md5(t._1)
-        (i._1 + ((t._2, t._1)), i._2 + ((id, t._2)))
+        val id = Util.md5(t)
+        (i + ((id, t)))
       }
     }
 
-    // sorted sequence of integers
-    val propertyIntIdsList = for (i <- 0 to propertyIdMaps._1.size - 1) yield i
-
     // string with all pairs for DB Select Statement
-    val pairString = propertyIdMaps._2.keySet.foldLeft(new StringBuilder())((i, row) => {
+    val pairString = propertyIdMap.keySet.foldLeft(new StringBuilder())((i, row) => {
       if (i.length() == 0) i.append("'" + row + "'")
       else i.append(",'" + row + "'")
     })
 
     // List of Pairs found on DB with a count assigned to them
-    val propPairWeightList = Q.queryNA[PairCounterRow]("select prop_1_id, prop_2_id, count from pair_counter where prop_1_id in (" + pairString.toString + ") and prop_2_id in (" + pairString.toString + ")")
-      .list
-
+    val propPairWeightList = Q.queryNA[PairCounterRow]("select prop_1_id, prop_2_id, count from pair_counter where prop_1_id in (" + pairString.toString + ") and prop_2_id in (" + pairString.toString + ")").list
     println("Pairs read from DB: " + propPairWeightList.size)
+
+    // Unique list of properties found on Database Table PairCounter
+    val propsUsedSet = propPairWeightList.foldLeft(Set[String]())((i, row) => i ++ Set(row.prop1Id, row.prop2Id))
+    val propertiesUsedList = propertyIdMap.filter(p => propsUsedSet.contains(p._1))
+    //val filteredPropPairWeightList = propPairWeightList.filter(p => propsUsedSet.contains(p.prop1Id) || propsUsedSet.contains(p.prop2Id))
+
+    println("Uniques Properties Used in Dataset: " + propertiesUsedList.size);
+
+    /* Generate temporary Maps mapping 1.) Integer Index to URI 2.) MD5 to Integer Index
+       * -P set means all unused properties are filtered out
+       * -P unset means, use all properties
+       */
+    val propertyIdMaps = {
+      if (options.contains("-P")) {
+        propertiesUsedList.zipWithIndex.foldLeft((Map[Int, String](), Map[String, Int]())) { (i, row) =>
+          {
+            (i._1 + ((row._2, row._1._2)), i._2 + ((row._1._1, row._2)))
+          }
+        }
+      } else {
+        properties.zipWithIndex.foldLeft((Map[Int, String](), Map[String, Int]())) { (i, t) =>
+          {
+            val id = Util.md5(t._1)
+            (i._1 + ((t._2, t._1)), i._2 + ((id, t._2)))
+          }
+        }
+      }
+    }
+
+    // sorted sequence of integers
+    val propertyIntIdsList = for (i <- 0 to propertyIdMaps._1.size - 1) yield i
 
     // List of Support of single properties from Triple List
     val propertyList = Q.queryNA[PropertiesUniqueRow]("select * from properties_unique where id in (" + pairString.toString + ")").list
@@ -273,6 +288,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     })
 
     (propertyDistanceMatrix, propertyIdMaps._1, propertyList, propertyCountMatrix)
+
   }
 
   def printDistanceMatrix(propertyMatrix: List[(Int, Int, Double)]) = {

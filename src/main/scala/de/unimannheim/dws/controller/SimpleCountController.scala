@@ -70,7 +70,7 @@ object SimpleCountController extends App {
       }
     })
     
-    val resList = SimpleCounter.retrieve(listTriples)
+    val resList = SimpleCounter.retrieve(listTriples, Array[String]())
     
     resList.map(r => println(r))
     
