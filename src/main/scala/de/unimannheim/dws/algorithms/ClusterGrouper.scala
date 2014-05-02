@@ -7,7 +7,7 @@ import java.io.FileWriter
 import scala.collection.mutable.StringBuilder
 import scala.slick.driver.PostgresDriver.simple.optionColumnExtensionMethods
 import scala.slick.driver.PostgresDriver.simple.queryToAppliedQueryInvoker
-import scala.slick.jdbc.{StaticQuery => Q}
+import scala.slick.jdbc.{ StaticQuery => Q }
 
 import de.unimannheim.dws.models.postgre.Tables.GetResultPairCounterRow
 import de.unimannheim.dws.models.postgre.Tables.GetResultPropertiesUniqueRow
@@ -85,14 +85,27 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
    * possible improvements
    * 1. use index
    */
-  def retrieve(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  def retrieve(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+    val triplesFiltered = {
+      if (options.contains("-L")) {
+
+        val index = options.indexOf("-L") + 1
+
+        options(index) match {
+          case "true" => triples.filter(t => t._3.startsWith("http"))
+          case "false" => triples
+          case _ => triples
+        }
+      } else triples
+    }
 
     // Calculate the distance matrix of given triples and Integer-URL-Resolver
-    val distanceMatrix = calculateDistanceMatrix(triples)
+    val distanceMatrix = calculateDistanceMatrix(triplesFiltered, options)
 
     // Prints a Pajek compatible net
     printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
-    
+
     // Pushes the Distance Matrix to the Interoperability Class
     DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
 
@@ -148,12 +161,27 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse
   }
 
-  def calculateDistanceMatrix(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow],List[(Int, Int, Double)]) = {
+  def calculateDistanceMatrix(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow], List[(Int, Int, Double)]) = {
 
     val properties = triples.map(_._2).removeDuplicates
 
     println("Unique Properties generated from TripleList: " + properties.size)
 
+    /* Filter out properties wo/ connections
+     * 1. Build MD5->HTTP Map of all properties
+     * 2. String Builder of that list
+     * 3. Query to PairCounter
+     * 4. Filter out all properties from List (1) that have not been used
+     * 5. Generate Integer-Index->Uri Map and MD5->Integer-Index Map
+     * 6. Generate sorted sequence
+     * 7. Query for support
+     * 8. Generate two collections
+     * 9. Generate distance matrix
+     * 10. Generate distance count matrix
+     */
+    
+    
+    
     // Generate temporary Maps mapping 1.) Integer Index to URI 2.) MD5 to Integer Index
     val propertyIdMaps = properties.zipWithIndex.foldLeft((Map[Int, String](), Map[String, Int]())) { (i, t) =>
       {
@@ -266,22 +294,22 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     out.close()
   }
 
-  def printDistanceMatrixAsNet(label:String, mapIdProp: Map[Int,String], propertyMatrix: List[(Int, Int, Double)]) = {
+  def printDistanceMatrixAsNet(label: String, mapIdProp: Map[Int, String], propertyMatrix: List[(Int, Int, Double)]) = {
 
-//    println("Pairs about to be written to file: " + propertyMatrix.size)
+    //    println("Pairs about to be written to file: " + propertyMatrix.size)
     // Print the Distance Matrix as required by Pajek
     val printLabel = label.split("/").last
-    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix_"+printLabel+".net");
+    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix_" + printLabel + ".net");
     file.getParentFile().mkdirs();
 
     val out: BufferedWriter = new BufferedWriter(new FileWriter(file));
 
     // Write Vertices
-    out.write("*Vertices "+mapIdProp.size)
+    out.write("*Vertices " + mapIdProp.size)
     out.newLine()
     val listIdProp = mapIdProp.toList.sortBy(_._1)
     listIdProp.foreach((k) => {
-      out.write(k._1+1 +" \""+k._2+"\"")
+      out.write(k._1 + 1 + " \"" + k._2 + "\"")
       out.newLine()
     })
     // Write Edges
@@ -289,7 +317,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     out.newLine()
     val lastEdge = propertyMatrix.reverse.head
     propertyMatrix.map(p => {
-      out.write((p._1+1) + " " + (p._2+1) + " " + p._3.toInt)
+      out.write((p._1 + 1) + " " + (p._2 + 1) + " " + p._3.toInt)
       if (!p.eq(lastEdge)) out.newLine()
     })
     out.flush()
@@ -383,8 +411,8 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
         options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
         options(4) = "-L"; // Link type
         options(5) = "CENTROID"
-        options(6) = "-P"  
-//                options(7) = "-B" // If set, distance is interpreted as branch length, otherwise it is node height.  
+        options(6) = "-P"
+        //                options(7) = "-B" // If set, distance is interpreted as branch length, otherwise it is node height.  
         var clusterer: HierarchicalClusterer = new HierarchicalClusterer() // new instance of clusterer
         clusterer.setOptions(options) // set the options
         println(clusterAlgo);

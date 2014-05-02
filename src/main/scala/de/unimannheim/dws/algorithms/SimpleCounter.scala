@@ -115,7 +115,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
   /**
    * Method to retrieve a sorted map of properties
    */
-  def retrieve(triples: List[(String, String, String)])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  def retrieve(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     if (triples.size > 0) {
       val entityId = Util.md5(triples.head._1)
