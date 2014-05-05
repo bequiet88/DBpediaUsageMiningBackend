@@ -23,7 +23,7 @@ import weka.core.FastVector
 import weka.core.Instance
 import weka.core.Instances
 
-object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, Double)] {
+object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
 
   /**
    * Method to generate property pairs with their number of hits

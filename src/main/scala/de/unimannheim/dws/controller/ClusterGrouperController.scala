@@ -9,11 +9,12 @@ import de.unimannheim.dws.models.mongo.ClassPropertyCounterDAO
 import de.unimannheim.dws.algorithms.ClusterGrouper
 import java.io.File
 import scala.io.Source
+import de.unimannheim.dws.algorithms.RankingAlgorithm
 
 object ClusterGrouperController extends App {
   DbConn.openConn withSession { implicit session =>
 
-//    createPropertyPairs(10000)
+    //    createPropertyPairs(10000)
     val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/berlin_test_triples.txt")
     readPropertyPairsCluster(file)
 
@@ -57,8 +58,8 @@ object ClusterGrouperController extends App {
 
     }
   }
-  
-    def readPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+  def readPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
 
@@ -66,16 +67,20 @@ object ClusterGrouperController extends App {
       val split = l.split(" ").toList
       if (split.size == 3) {
         (split(0), split(1), split(2))
+      } else if (split.size > 3) {
+        val objectLiteral = split.slice(2, split.size).foldLeft(new StringBuilder())((i, row) => {
+          i.append(row + " ")
+        })
+        (split(0), split(1), objectLiteral.toString)
       } else {
         ("", "", "")
       }
     })
-    
-    val resList = ClusterGrouper.retrieve(listTriples, Array[String]())
-    
+
+    val resList = ClusterGrouper.getRankedTriples(listTriples, ClusterGrouper.retrieve(listTriples, Array[String]()))
+
     resList.map(r => println(r))
-    
 
   }
-  
+
 }

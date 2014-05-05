@@ -65,12 +65,17 @@ object SimpleCountController extends App {
       val split = l.split(" ").toList
       if (split.size == 3) {
         (split(0), split(1), split(2))
+      } else if (split.size > 3) {
+        val objectLiteral = split.slice(2, split.size).foldLeft(new StringBuilder())((i, row) => {
+          i.append(row + " ")
+        })
+        (split(0), split(1), objectLiteral.toString)
       } else {
         ("", "", "")
       }
     })
     
-    val resList = SimpleCounter.retrieve(listTriples, Array[String]("-S", "frequency", "-N", "7"))
+    val resList = SimpleCounter.getRankedTriples(listTriples, SimpleCounter.retrieve(listTriples, Array[String]("-S", "interval", "-N", "3")))
     
     resList.map(r => println(r))
     

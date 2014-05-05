@@ -11,7 +11,7 @@ import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
 import de.unimannheim.dws.preprocessing.Util
 
-object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, String, Double)] {
+object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow] {
 
   /**
    * Method to generate class property pairs with their number of hits
@@ -295,7 +295,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       }
     }.toList.flatten
 
-    resList
+    resList.sortBy(r => (r._2, r._3)).reverse
   }
 
   private def discretizeByFreq(noOfBins: Int, data: List[(String, Double)]): List[(String, String, Double)] = {
@@ -320,7 +320,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       }
     }.toList.flatten
 
-    resList
+    resList.sortBy(r => (r._2, r._3)).reverse
   }
 
   private def resMapGenerator(propertiesAll: Map[String, List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], leafClasses: List[OntClass], resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
