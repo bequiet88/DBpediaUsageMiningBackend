@@ -98,6 +98,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
     // Prints a Pajek compatible net
     printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
+    printDistanceMatrix(triples.head._1,distanceMatrix._1)
 
     // Pushes the Distance Matrix to the Interoperability Class
     DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
@@ -294,11 +295,12 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
   }
 
-  def printDistanceMatrix(propertyMatrix: List[(Int, Int, Double)]) = {
+  def printDistanceMatrix(label: String, propertyMatrix: List[(Int, Int, Double)]) = {
 
     println("Pairs about to be written to file: " + propertyMatrix.size)
     // Print the Distance Matrix as required by ELKI 
-    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix.ascii");
+    val printLabel = label.split("/").last
+    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/distance_matrices/distance_matrix_" + printLabel + ".txt");
     file.getParentFile().mkdirs();
 
     val out: BufferedWriter = new BufferedWriter(new FileWriter(file));
@@ -429,7 +431,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
         options(2) = "-A"; // distance function
         options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
         options(4) = "-L"; // Link type
-        options(5) = "CENTROID"
+        options(5) = "WARD"
         options(6) = "-P"
         //                options(7) = "-B" // If set, distance is interpreted as branch length, otherwise it is node height.  
         var clusterer: HierarchicalClusterer = new HierarchicalClusterer() // new instance of clusterer

@@ -71,7 +71,7 @@ object ClusterGrouperController extends App {
       }
     })
     
-    val resList = ClusterGrouper.retrieve(listTriples, Array[String]("-P"))
+    val resList = ClusterGrouper.retrieve(listTriples, Array[String]())
     
     resList.map(r => println(r))
     
