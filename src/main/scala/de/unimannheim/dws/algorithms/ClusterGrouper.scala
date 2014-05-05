@@ -124,7 +124,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     }
 
     // 4. instantiate clusterer
-    var clusterer = getClusterer("DBSCAN")
+    var clusterer = getClusterer("HierarchicalClusterer")
     clusterer.buildClusterer(data) // build the clusterer
     println(clusterer.toString)
 
@@ -265,11 +265,14 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
       val tempPropMatrix = listInnerLoop.map(subId => {
         val count = propPairWeightUniqueLists._1.getOrElse((id, subId), 0D)
-        if (count == 0D) {
-          (id, subId, 10D)
-        } else {
-          (id, subId, 1 / count)
-        }
+        	val distance = 1 / (count +	5)
+        	(id, subId, distance)
+// Old calculation        
+//        if (count == 0D) {
+//          (id, subId, 10D)
+//        } else {
+//          (id, subId, 1 / count)
+//        }
       })
       i ++ tempPropMatrix
     })
@@ -406,8 +409,8 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
         options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
         options(4) = "-I" // Maximum iterations
         options(5) = "100"
-        //        options(6) = "-S" // Random number seed.
-        //        options(7) = "908349"
+//                options(6) = "-S" // Random number seed.
+//                options(7) = "908349"
         //        options(8) = "-output-debug-info"
         //        options(9) = "-init"
         //        options(10) = "1"

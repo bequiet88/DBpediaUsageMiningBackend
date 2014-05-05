@@ -170,6 +170,11 @@ public class CustomPairWiseDistance extends NormalizableDistance implements
 
 		validate();
 
+		if(value1 > value2) {
+			Integer helper = value1;
+			value1 = value2;
+			value2 = helper;					
+		}
 		distance = DistanceMatrix$.MODULE$.getDistance(value1, value2)
 				.doubleValue();
 

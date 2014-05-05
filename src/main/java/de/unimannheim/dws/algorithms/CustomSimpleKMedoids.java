@@ -440,12 +440,12 @@ public class CustomSimpleKMedoids extends RandomizableClusterer implements
 	    double smallestError = Double.MAX_VALUE;
 	    Instance currentCentroid = null;
 	    
-	    for (int j = 0; j < members.numAttributes(); j++) {
+	    for (int j = 0; j < members.numInstances(); j++) {
 	    	
 	    	Instance currentInstance = members.instance(j);
 	    	double distanceError = 0D;
-	    	for(int i =0; i < members.numAttributes(); i++) {
-	    		distanceError += m_DistanceFunction.distance(currentInstance, members.instance(j));
+	    	for(int i =0; i < members.numInstances(); i++) {
+	    		distanceError += m_DistanceFunction.distance(currentInstance, members.instance(i));
 	    	}
 	    	if(distanceError<smallestError) {
 	    		smallestError = distanceError;
@@ -1001,7 +1001,7 @@ public class CustomSimpleKMedoids extends RandomizableClusterer implements
 	    /*
 	     * for (int i = 0; i < maxWidth+2; i++) { naString += " "; }
 	     */
-	    temp.append("\nkMeans\n======\n");
+	    temp.append("\nkMedoids\n======\n");
 	    temp.append("\nNumber of iterations: " + m_Iterations + "\n");
 
 	    if (m_DistanceFunction instanceof EuclideanDistance) {
