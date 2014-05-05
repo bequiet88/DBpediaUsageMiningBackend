@@ -26,4 +26,6 @@ import de.unimannheim.dws.models.postgre.Tables._
                                                   //| ow(aa,aa,Some(0))
  
  _1.equalsByReverseIds(_2)                        //> res3: Boolean = true
+ 
+ val d = 25/3                                     //> d  : Int = 8
 }

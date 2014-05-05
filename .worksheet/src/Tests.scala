@@ -20,5 +20,7 @@ import de.unimannheim.dws.models.postgre.Tables._;System.out.println("""res2: sc
  val _1 = PairCounterRow(prop1Id = "aa", prop2Id="aa", count= Some(0));System.out.println("""_1  : de.unimannheim.dws.models.postgre.Tables.PairCounterRow = """ + $show(_1 ));$skip(71); 
  val _2 = PairCounterRow(prop1Id = "aa", prop2Id="aa", count= Some(0));System.out.println("""_2  : de.unimannheim.dws.models.postgre.Tables.PairCounterRow = """ + $show(_2 ));$skip(29); val res$3 = 
  
- _1.equalsByReverseIds(_2);System.out.println("""res3: Boolean = """ + $show(res$3))}
+ _1.equalsByReverseIds(_2);System.out.println("""res3: Boolean = """ + $show(res$3));$skip(16); 
+ 
+ val d = 25/3;System.out.println("""d  : Int = """ + $show(d ))}
 }

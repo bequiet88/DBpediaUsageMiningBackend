@@ -11,7 +11,7 @@ import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
 import de.unimannheim.dws.preprocessing.Util
 
-object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, Double)] {
+object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, String, Double)] {
 
   /**
    * Method to generate class property pairs with their number of hits
@@ -140,10 +140,10 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
         if cp.classId === c.id
         if cp.propertyId === p.id
       } yield (c.label, (p.id, p.prefix, p.property, cp.count))).list.groupBy(l => l._1.get)
-      
+
       val properties = propertiesAll.get(classLabel._2.get).getOrElse(List()).map(_._2).filter(p => propertyIds.contains(p._1))
 
-//      println("For " + classLabel._2 + " properties found on DB " + properties.size)
+      //      println("For " + classLabel._2 + " properties found on DB " + properties.size)
 
       /*
        * check whether props from DB present in this triple list's predicates
@@ -175,7 +175,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       /*
        * Check whether class super classes exists and contain properties
        */
-    
+
       val superClasses = ontClass.listSuperClasses().asScala.toList diff List(ontClass)
       val superResMapPropIds = {
         if (subClasses.size > 0) {
@@ -190,14 +190,38 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       /*
        * In case all elements are full, return a sorted list, otherwise go into the recursion
        */
-      if (superResMapPropIds._2.size > propertyIds.size/2D) {
-        recursiveRetrieval(propertiesAll, superResMapPropIds._2, ontClass, superResMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
-      } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
+      val result = {
+        if (superResMapPropIds._2.size > propertyIds.size / 2D) {
+          recursiveRetrieval(propertiesAll, superResMapPropIds._2, ontClass, superResMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
+        } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
+      }
+
+      val noOfBins = {
+        if (options.contains("-N")) {
+          val indexS = options.indexOf("-N")
+          if (indexS + 1 < options.length) {
+            try {
+              Integer.parseInt(options(indexS + 1))
+            } catch {
+              case t: Exception => 3 // todo: handle error
+            }
+          } else 3
+        } else 3
+      }
+
+      if (options.contains("-S")) {
+        val indexS = options.indexOf("-S")
+        if (indexS + 1 < options.length) {
+          if (options(indexS + 1).equals("interval")) discretizeByInterval(noOfBins, result)
+          else if (options(indexS + 1).equals("frequency")) discretizeByFreq(noOfBins, result)
+          else discretizeByInterval(noOfBins, result)
+        } else discretizeByFreq(noOfBins, result)
+      } else discretizeByFreq(noOfBins, result)
+
     } else List()
   }
 
-
-  private def recursiveRetrieval(propertiesAll:   Map[String,List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], ontClass: OntClass, resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
+  private def recursiveRetrieval(propertiesAll: Map[String, List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], ontClass: OntClass, resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session): Map[String, Double] = {
 
     val superClass = ontClass.listSuperClasses(true).asScala.toList(0)
     val subClasses = superClass.listSubClasses(true).asScala.toList diff List(ontClass)
@@ -245,7 +269,61 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
     }
   }
 
-  private def resMapGenerator(propertiesAll: Map[String,List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], leafClasses: List[OntClass], resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  private def discretizeByInterval(noOfBins: Int, data: List[(String, Double)]): List[(String, String, Double)] = {
+
+    val counts = data.map(_._2)
+
+    val max = data max Ordering[Double].on[(_, Double)](_._2)
+    val min = data min Ordering[Double].on[(_, Double)](_._2)
+
+    val binSize = (max._2 - min._2) / noOfBins
+
+    val resList = {
+      for (i <- 0 to noOfBins - 1) yield {
+
+        val values = {
+          if (i == 0) {
+            data.filter(r => r._2 <= binSize)
+          } else if (i == (noOfBins - 1)) {
+            data.filter(r => r._2 > binSize * i && r._2 <= (binSize * (i + 1)) + 1)
+          } else {
+            data.filter(r => r._2 > binSize * i && r._2 <= binSize * (i + 1))
+          }
+        }
+
+        values.map(r => (r._1, i.toString, r._2))
+      }
+    }.toList.flatten
+
+    resList
+  }
+
+  private def discretizeByFreq(noOfBins: Int, data: List[(String, Double)]): List[(String, String, Double)] = {
+
+    val binSizeDouble = (data.length) / noOfBins.toDouble
+    val binSize = Util.round(binSizeDouble, 0).toInt
+
+    val resList = {
+      for (i <- 0 to noOfBins - 1) yield {
+
+        val values = {
+          if (i == 0) {
+            data.slice(i * binSize, (i + 1) * binSize)
+          } else if (i == (noOfBins - 1)) {
+            data.slice((i * binSize), ((i + 1) * binSize) + 1)
+          } else {
+            data.slice((i * binSize), ((i + 1) * binSize))
+          }
+        }
+
+        values.map(r => (r._1, i.toString, r._2))
+      }
+    }.toList.flatten
+
+    resList
+  }
+
+  private def resMapGenerator(propertiesAll: Map[String, List[(Option[String], (String, Option[String], Option[String], Option[Int]))]], propertyIds: List[String], leafClasses: List[OntClass], resMap: Map[String, Double], weight: Double)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     leafClasses.removeDuplicates.foldLeft((resMap, propertyIds))((i, classLabel) => {
 
@@ -255,7 +333,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
        */
         val properties = propertiesAll.get(classLabel.getURI()).getOrElse(List()).map(_._2).filter(p => propertyIds.contains(p._1))
 
-//        println("For " + classLabel.getURI() + " properties found on DB " + properties.size)
+        //        println("For " + classLabel.getURI() + " properties found on DB " + properties.size)
 
         /*
        * check whether props from DB present in this triple list's predicates
@@ -271,15 +349,12 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       } else (i._1, i._2)
     })
   }
-  
-  
-  
-  
-  
-  
-  /*********************************
+
+  /**
+   * *******************************
    * Methods for Slow Implementation
-   *********************************/
+   * *******************************
+   */
 
   /**
    * Method to retrieve a sorted map of properties
@@ -342,7 +417,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       /*
        * Check whether class superclasses exists and contain properties
        */
-    
+
       val superClasses = ontClass.listSuperClasses().asScala.toList diff List(ontClass)
       val superResMapPropIds = {
         if (subClasses.size > 0) {
@@ -359,7 +434,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, (String, 
       /*
        * In case all elements are full, return a sorted list, otherwise go into the recursion
        */
-      if (superResMapPropIds._2.size > propertyIds.size/2D) {
+      if (superResMapPropIds._2.size > propertyIds.size / 2D) {
         recursiveRetrievalSlow(superResMapPropIds._2, ontClass, superResMapPropIds._1, 0.5D).toList.sortBy({ _._2 }).reverse
       } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
     } else List()

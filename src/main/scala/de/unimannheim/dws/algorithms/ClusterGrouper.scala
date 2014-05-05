@@ -155,7 +155,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse
   }
 
-  def calculateDistanceMatrix(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow], List[(Int, Int, Double)]) = {
+  private def calculateDistanceMatrix(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow], List[(Int, Int, Double)]) = {
 
     val properties = triples.map(_._2).removeDuplicates
 
@@ -295,7 +295,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
   }
 
-  def printDistanceMatrix(label: String, propertyMatrix: List[(Int, Int, Double)]) = {
+  private def printDistanceMatrix(label: String, propertyMatrix: List[(Int, Int, Double)]) = {
 
     println("Pairs about to be written to file: " + propertyMatrix.size)
     // Print the Distance Matrix as required by ELKI 
@@ -315,7 +315,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     out.close()
   }
 
-  def printDistanceMatrixAsNet(label: String, mapIdProp: Map[Int, String], propertyMatrix: List[(Int, Int, Double)]) = {
+  private def printDistanceMatrixAsNet(label: String, mapIdProp: Map[Int, String], propertyMatrix: List[(Int, Int, Double)]) = {
 
     //    println("Pairs about to be written to file: " + propertyMatrix.size)
     // Print the Distance Matrix as required by Pajek
@@ -345,7 +345,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
     out.close()
   }
 
-  def convertDistanceMatrixToWeka(distancesList: List[(Int, Int, Double)]): Map[(Integer, Integer), java.math.BigDecimal] = {
+  private def convertDistanceMatrixToWeka(distancesList: List[(Int, Int, Double)]): Map[(Integer, Integer), java.math.BigDecimal] = {
 
     distancesList.foldLeft(Map[(Integer, Integer), java.math.BigDecimal]())((i, row) => {
 
@@ -365,7 +365,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (String, String, 
 
   }
 
-  def getClusterer(clusterAlgo: String): AbstractClusterer = {
+  private def getClusterer(clusterAlgo: String): AbstractClusterer = {
 
     clusterAlgo match {
       case "DBSCAN" => {
