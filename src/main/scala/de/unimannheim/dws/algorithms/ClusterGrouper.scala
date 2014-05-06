@@ -171,17 +171,19 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
     // Filter out Top-N multiple triples - default is 0
     val properties = {
       if (options.contains("-R")) {
-        val indexR = options.indexOf("-R")
-        if (indexR + 1 < options.length) {
-          try {
-            val no = Integer.parseInt(options(indexR + 1))
-            val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
-              .toList.sortBy({ _._2 }).reverse.map(_._1)
-            sortedPropList.slice(no, sortedPropList.length)
-          } catch {
-            case t: Exception => triples.map(_._2).removeDuplicates
-          }
-        } else triples.map(_._2).removeDuplicates
+        val props = triples.map(_._2).removeDuplicates
+        props.filterNot(p => Util.getPropertiesToRemove.contains(p))
+//        val indexR = options.indexOf("-R")
+//        if (indexR + 1 < options.length) {
+//          try {
+//            val no = Integer.parseInt(options(indexR + 1))
+//            val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
+//              .toList.sortBy({ _._2 }).reverse.map(_._1)
+//            sortedPropList.slice(no, sortedPropList.length)
+//          } catch {
+//            case t: Exception => triples.map(_._2).removeDuplicates
+//          }
+//        } else triples.map(_._2).removeDuplicates
       } else triples.map(_._2).removeDuplicates
     }
 
