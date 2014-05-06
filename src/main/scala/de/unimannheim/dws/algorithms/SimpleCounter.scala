@@ -11,7 +11,7 @@ import de.unimannheim.dws.models.postgre.Tables._
 import de.unimannheim.dws.preprocessing.DBpediaOntologyAccess
 import de.unimannheim.dws.preprocessing.Util
 
-object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow] {
+object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, List[(String, String, Double)]] {
 
   /**
    * Method to generate class property pairs with their number of hits
@@ -119,9 +119,27 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow] {
 
     if (triples.size > 0) {
       val entityId = Util.md5(triples.head._1)
-      val propertyIds = triples.map(t => {
-        Util.md5(t._2.trim())
-      }).removeDuplicates
+
+      // Filter out Top-N multiple triples - default is 0
+      val props = {
+        if (options.contains("-R")) {
+          val indexR = options.indexOf("-R")
+          if (indexR + 1 < options.length) {
+            try {
+              val no = Integer.parseInt(options(indexR + 1))
+              val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
+                .toList.sortBy({ _._2 }).reverse.map(_._1)
+              sortedPropList.slice(no + 1, sortedPropList.length)
+            } catch {
+              case t: Exception => triples.map(_._2).removeDuplicates
+            }
+          } else triples.map(_._2).removeDuplicates
+        } else triples.map(_._2).removeDuplicates
+      }
+
+      val propertyIds = props.map(p => {
+        Util.md5(p.trim())
+      })
 
       /*
        * Read class label for this entity from DB
@@ -196,19 +214,25 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow] {
         } else superResMapPropIds._1.toList.sortBy({ _._2 }).reverse
       }
 
+      /*
+       * Determine bin size - default is 3
+       */
       val noOfBins = {
         if (options.contains("-N")) {
-          val indexS = options.indexOf("-N")
-          if (indexS + 1 < options.length) {
+          val indexN = options.indexOf("-N")
+          if (indexN + 1 < options.length) {
             try {
-              Integer.parseInt(options(indexS + 1))
+              Integer.parseInt(options(indexN + 1))
             } catch {
-              case t: Exception => 3 // todo: handle error
+              case t: Exception => 3
             }
           } else 3
         } else 3
       }
 
+      /*
+       * Determine discretizing function - default is by Frequency
+       */
       if (options.contains("-S")) {
         val indexS = options.indexOf("-S")
         if (indexS + 1 < options.length) {

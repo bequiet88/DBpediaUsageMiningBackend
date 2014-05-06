@@ -23,7 +23,7 @@ import weka.core.FastVector
 import weka.core.Instance
 import weka.core.Instances
 
-object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
+object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, String, Double)], String)] {
 
   /**
    * Method to generate property pairs with their number of hits
@@ -87,10 +87,21 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
    */
   def retrieve(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
+    // Use only Triples with URI object - if activated
     val triplesFiltered = {
       if (options.contains("-L")) {
         triples.filter(t => t._3.startsWith("http"))
       } else triples
+    }
+
+    // Determine the Cluster Algorithm to be used - default is Custom K-Medoids
+    val clusterAlgo = {
+      if (options.contains("-C")) {
+        val indexC = options.indexOf("-C")
+        if (indexC + 1 < options.length) {
+          options(indexC + 1)
+        } else "CustomKMedoids"
+      } else "CustomKMedoids"
     }
 
     // Calculate the distance matrix of given triples and Integer-URL-Resolver
@@ -98,7 +109,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
 
     // Prints a Pajek compatible net
     printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
-    printDistanceMatrix(triples.head._1,distanceMatrix._1)
+    printDistanceMatrix(triples.head._1, distanceMatrix._1)
 
     // Pushes the Distance Matrix to the Interoperability Class
     DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
@@ -125,7 +136,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
     }
 
     // 4. instantiate clusterer
-    var clusterer = getClusterer("HierarchicalClusterer")
+    var clusterer = getClusterer(clusterAlgo)
     clusterer.buildClusterer(data) // build the clusterer
     println(clusterer.toString)
 
@@ -152,12 +163,27 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
       (propLabel, cluster, support)
     }).toList
 
-    resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse
+    (resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse, clusterer.toString())
   }
 
   private def calculateDistanceMatrix(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow], List[(Int, Int, Double)]) = {
 
-    val properties = triples.map(_._2).removeDuplicates
+    // Filter out Top-N multiple triples - default is 0
+    val properties = {
+      if (options.contains("-R")) {
+        val indexR = options.indexOf("-R")
+        if (indexR + 1 < options.length) {
+          try {
+            val no = Integer.parseInt(options(indexR + 1))
+            val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
+              .toList.sortBy({ _._2 }).reverse.map(_._1)
+            sortedPropList.slice(no + 1, sortedPropList.length)
+          } catch {
+            case t: Exception => triples.map(_._2).removeDuplicates
+          }
+        } else triples.map(_._2).removeDuplicates
+      } else triples.map(_._2).removeDuplicates
+    }
 
     println("Unique Properties generated from TripleList: " + properties.size)
 
@@ -266,14 +292,14 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
 
       val tempPropMatrix = listInnerLoop.map(subId => {
         val count = propPairWeightUniqueLists._1.getOrElse((id, subId), 0D)
-        	val distance = 1 / (count +	5)
-        	(id, subId, distance)
-// Old calculation        
-//        if (count == 0D) {
-//          (id, subId, 10D)
-//        } else {
-//          (id, subId, 1 / count)
-//        }
+        val distance = 1 / (count + 5)
+        (id, subId, distance)
+        // Old calculation        
+        //        if (count == 0D) {
+        //          (id, subId, 10D)
+        //        } else {
+        //          (id, subId, 1 / count)
+        //        }
       })
       i ++ tempPropMatrix
     })
@@ -411,8 +437,8 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow] {
         options(3) = "de.unimannheim.dws.algorithms.CustomPairWiseDistance"
         options(4) = "-I" // Maximum iterations
         options(5) = "100"
-//                options(6) = "-S" // Random number seed.
-//                options(7) = "908349"
+        //                options(6) = "-S" // Random number seed.
+        //                options(7) = "908349"
         //        options(8) = "-output-debug-info"
         //        options(9) = "-init"
         //        options(10) = "1"

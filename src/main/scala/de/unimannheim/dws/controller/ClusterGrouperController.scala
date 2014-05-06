@@ -77,7 +77,11 @@ object ClusterGrouperController extends App {
       }
     })
 
-    val resList = ClusterGrouper.getRankedTriples(listTriples, ClusterGrouper.retrieve(listTriples, Array[String]()))
+    val options = Array[String]()
+    val clusterRes = ClusterGrouper.retrieve(listTriples, options)
+    val resList = ClusterGrouper.getRankedTriples(listTriples, clusterRes._1)
+    
+    ClusterGrouper.printResults(resList, options, clusterRes._2)
 
     resList.map(r => println(r))
 

@@ -75,10 +75,12 @@ object SimpleCountController extends App {
       }
     })
     
-    val resList = SimpleCounter.getRankedTriples(listTriples, SimpleCounter.retrieve(listTriples, Array[String]("-S", "interval", "-N", "3")))
+    val options = Array[String]("-S", "interval", "-N", "3")
+    val countRes = SimpleCounter.retrieve(listTriples, Array[String]())
+    val resList = SimpleCounter.getRankedTriples(listTriples, countRes)
+    
+    SimpleCounter.printResults(resList, options)
     
     resList.map(r => println(r))
-    
-
   }
 }
