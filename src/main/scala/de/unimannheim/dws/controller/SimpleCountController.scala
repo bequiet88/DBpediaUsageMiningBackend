@@ -13,9 +13,15 @@ import java.io.File
 object SimpleCountController extends App {
   DbConn.openConn withSession { implicit session =>
 
-//    createClassPropertyPairs(1000)
-    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/berlin_test_triples.txt")
-    readClassPropertyPairs(file)
+    val testFiles = List("bawü", "einstein", "germany", "hockenheim", "matrix")
+
+    testFiles.foreach(f => {
+      val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples_with_object.txt")
+      readClassPropertyPairs(file)
+
+    })
+    //    createClassPropertyPairs(1000)
+
   }
 
   def createClassPropertyPairs(stepSize: Int)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
@@ -74,13 +80,25 @@ object SimpleCountController extends App {
         ("", "", "")
       }
     })
-    
-    val options = Array[String]("-S", "interval", "-N", "3")
-    val countRes = SimpleCounter.retrieve(listTriples, Array[String]())
-    val resList = SimpleCounter.getRankedTriples(listTriples, countRes)
-    
-    SimpleCounter.printResults(resList, options)
-    
-    resList.map(r => println(r))
+
+    val optionsList: List[Array[String]] = List(Array[String]("-O","-S", "interval", "-N", "3", "-R", "7"),
+      Array[String]("-O","-S", "interval", "-N", "3"),
+      Array[String]("-O","-S", "frequency", "-N", "3", "-R", "7"),
+      Array[String]("-O","-S", "frequency", "-N", "3"))
+
+    optionsList.foreach(o => {
+
+      val options = o
+      val countRes = SimpleCounter.retrieve(listTriples, options)
+      countRes.map(r => println(r))
+
+      val resList = SimpleCounter.getRankedTriples(listTriples, countRes)
+
+      SimpleCounter.printResults(resList, options)
+
+      resList.map(r => println(r))
+
+    })
+
   }
 }

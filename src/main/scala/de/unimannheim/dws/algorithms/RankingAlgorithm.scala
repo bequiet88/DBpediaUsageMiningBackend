@@ -73,6 +73,7 @@ abstract class RankingAlgorithm[T, S] {
       } else {
         out.newLine()
         out.write("Group " + row._2)
+        out.newLine()
         out.write(row._2 + " " + row._1._1 + " " + row._1._2 + " " + row._1._3)
         out.newLine()
         row._2

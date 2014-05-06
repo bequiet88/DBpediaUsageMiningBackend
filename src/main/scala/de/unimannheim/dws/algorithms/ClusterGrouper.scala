@@ -177,7 +177,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
             val no = Integer.parseInt(options(indexR + 1))
             val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
               .toList.sortBy({ _._2 }).reverse.map(_._1)
-            sortedPropList.slice(no + 1, sortedPropList.length)
+            sortedPropList.slice(no, sortedPropList.length)
           } catch {
             case t: Exception => triples.map(_._2).removeDuplicates
           }

@@ -14,9 +14,13 @@ import de.unimannheim.dws.algorithms.RankingAlgorithm
 object ClusterGrouperController extends App {
   DbConn.openConn withSession { implicit session =>
 
-    //    createPropertyPairs(10000)
-    val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/berlin_test_triples.txt")
-    readPropertyPairsCluster(file)
+    val testFiles = List("bawü", "einstein", "germany", "hockenheim", "matrix")
+
+    testFiles.foreach(f => {
+      val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples.txt")
+      readPropertyPairsCluster(file)
+
+    })
 
   }
 
@@ -77,14 +81,29 @@ object ClusterGrouperController extends App {
       }
     })
 
-    val options = Array[String]()
-    val clusterRes = ClusterGrouper.retrieve(listTriples, options)
-    val resList = ClusterGrouper.getRankedTriples(listTriples, clusterRes._1)
-    
-    ClusterGrouper.printResults(resList, options, clusterRes._2)
+    val optionsList: List[Array[String]] = List(Array[String]("-C", "CustomKMedoids","-P","-R","7"),
+      Array[String]("-C", "CustomKMedoids","-P"),
+      Array[String]("-C", "CustomKMedoids","-R","7"),
+      Array[String]("-C", "CustomKMedoids"),
+      Array[String]("-C", "DBSCAN","-P","-R","7"),
+      Array[String]("-C", "DBSCAN","-P"),
+      Array[String]("-C", "DBSCAN","-R","7"),
+      Array[String]("-C", "DBSCAN"),
+      Array[String]("-C", "HierarchicalClusterer","-P","-R","7"),
+      Array[String]("-C", "HierarchicalClusterer","-P"),
+      Array[String]("-C", "HierarchicalClusterer","-R","7"),
+      Array[String]("-C", "HierarchicalClusterer"))
 
-    resList.map(r => println(r))
+    optionsList.foreach(o => {
 
+      val options = o
+      val clusterRes = ClusterGrouper.retrieve(listTriples, options)
+      val resList = ClusterGrouper.getRankedTriples(listTriples, clusterRes._1)
+
+      ClusterGrouper.printResults(resList, options, clusterRes._2)
+
+      resList.map(r => println(r))
+    })
   }
 
 }

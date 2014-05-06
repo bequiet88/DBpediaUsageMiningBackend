@@ -1001,7 +1001,7 @@ public class CustomSimpleKMedoids extends RandomizableClusterer implements
 	    /*
 	     * for (int i = 0; i < maxWidth+2; i++) { naString += " "; }
 	     */
-	    temp.append("\nkMedoids\n======\n");
+	    temp.append("\nkMedoids\n========\n");
 	    temp.append("\nNumber of iterations: " + m_Iterations + "\n");
 
 	    if (m_DistanceFunction instanceof EuclideanDistance) {

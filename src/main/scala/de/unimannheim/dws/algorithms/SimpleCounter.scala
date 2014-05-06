@@ -129,7 +129,7 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, List[(Str
               val no = Integer.parseInt(options(indexR + 1))
               val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
                 .toList.sortBy({ _._2 }).reverse.map(_._1)
-              sortedPropList.slice(no + 1, sortedPropList.length)
+              sortedPropList.slice(no, sortedPropList.length)
             } catch {
               case t: Exception => triples.map(_._2).removeDuplicates
             }
@@ -332,11 +332,11 @@ object SimpleCounter extends RankingAlgorithm[ClassPropertyCounterRow, List[(Str
 
         val values = {
           if (i == 0) {
-            data.slice(i * binSize, (i + 1) * binSize)
+            data.reverse.slice(i * binSize, (i + 1) * binSize)
           } else if (i == (noOfBins - 1)) {
-            data.slice((i * binSize), ((i + 1) * binSize) + 1)
+            data.reverse.slice((i * binSize), ((i + 1) * binSize) + 1)
           } else {
-            data.slice((i * binSize), ((i + 1) * binSize))
+            data.reverse.slice((i * binSize), ((i + 1) * binSize))
           }
         }
 
