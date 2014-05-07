@@ -21,8 +21,13 @@ abstract class RankingAlgorithm[T, S] {
    */
   def getRankedTriples(triples: List[(String, String, String)], list: List[(String, String, Double)]): List[((String, String, String), String)] = {
 
-    val groupedTriples = triples.groupBy(_._2)
+    // Group triples by their properties
+    val groupedTriples = triples.sortBy(_._2).groupBy(_._2)
 
+    /* Returns 
+     * 1. a list of ranked triples according the ranking of their properties
+     * 2. a map of remaining properties and their triples holding all props that does not occur in the ranked property list
+     */    
     val resultCols = list.foldLeft((List[((String, String, String), String)](), groupedTriples)) { (i, row) =>
       {
         val values = i._2.get(row._1).getOrElse(List()).map(t => (t, row._2))
@@ -30,21 +35,21 @@ abstract class RankingAlgorithm[T, S] {
         (i._1 ++ ((values)), i._2.filterNot(r => r._1 == row._1))
       }
     }
-
-    resultCols._2.foldLeft(resultCols._1) { (i, row) =>
+    
+    val remainingTriples = resultCols._2.foldLeft(List[((String, String, String),String)]()) { (i, row) =>
       {
         val values = row._2.map(t => (t, "noise"))
         i ++ values
       }
-    }
+    }.sortBy(_._1._2)
+
+    resultCols._1++remainingTriples
   }
 
   /**
    * Print the result to file
    */
-  def printResults(triples: List[((String, String, String), String)], options: Array[String], clusterInfo: String): Any = {
-
-    val label = triples.head._1._1.split("/").last
+  def printResults(triples: List[((String, String, String), String)], options: Array[String], clusterInfo: String, label: String): Any = {
 
     val fileName = options.foldLeft(new StringBuilder())((i, row) => {
       if (i.length() == 0) {
@@ -86,8 +91,8 @@ abstract class RankingAlgorithm[T, S] {
 
   }
 
-  def printResults(triples: List[((String, String, String), String)], options: Array[String]): Any = {
-    printResults(triples, options, "")
+  def printResults(triples: List[((String, String, String), String)], options: Array[String], label: String): Any = {
+    printResults(triples, options, "", label)
   }
 
 }

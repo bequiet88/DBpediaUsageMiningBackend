@@ -1,8 +1,12 @@
 import org.joda.time.format.DateTimeFormatter
 
-object Tests {
+object Tests {;import org.scalaide.worksheet.runtime.library.WorksheetSupport._; def main(args: Array[String])=$execute{;$skip(110); 
 
-  import org.joda.time.DateTime;import org.scalaide.worksheet.runtime.library.WorksheetSupport._; def main(args: Array[String])=$execute{;$skip(140); 
+val liste = List("A", "C", "B").sortBy(p => p);System.out.println("""liste  : List[String] = """ + $show(liste ));$skip(18); 
+
+val mod = 9 %(2)
+
+  import org.joda.time.DateTime;System.out.println("""mod  : Int = """ + $show(mod ));$skip(78); 
   println("Welcome to the Scala worksheet");$skip(35); 
 
   val test = "1kfjsdf:lkfdslfkL";System.out.println("""test  : String = """ + $show(test ));$skip(33); val res$0 = 

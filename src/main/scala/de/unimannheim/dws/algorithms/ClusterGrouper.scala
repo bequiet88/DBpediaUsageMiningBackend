@@ -163,7 +163,29 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
       (propLabel, cluster, support)
     }).toList
 
-    (resList.filter(r => !r._1.equals("")).groupBy(r => r._2).map(r => r._2.sortBy(r => r._3)).toList.flatten.reverse, clusterer.toString())
+    // Sort Cluster-Property List by cluster median
+    val clusterPropsMap = resList.filter(r => !r._1.equals("")).sortBy(r => r._3).reverse.groupBy(r => r._2)
+    val sortedClusterMedianList = clusterPropsMap.map(c => {
+      val median = {
+        // length is odd, take element (n+1)/2 of list
+        if (c._2.size.%(2) == 1) c._2(((c._2.size + 1) / 2) - 1)._3
+        // length is even, take half of the both central objects
+        else {
+          val e1 = c._2((c._2.size / 2) - 1)._3
+          val e2 = c._2((c._2.size / 2))._3
+          (e1+e2)/2
+        }
+      }
+      (c._1, median)
+    }).toList.sortBy(_._2).reverse
+    
+    // Append the property lists of the clusters according their sorted order of cluster medians to a res list
+    val res = sortedClusterMedianList.foldLeft(List[(String, String, Double)]())((i, row) => {
+     i++clusterPropsMap(row._1)
+    })
+    
+
+    (res, clusterer.toString())
   }
 
   private def calculateDistanceMatrix(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): (List[(Int, Int, Double)], Map[Int, String], List[PropertiesUniqueRow], List[(Int, Int, Double)]) = {
@@ -173,17 +195,17 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
       if (options.contains("-R")) {
         val props = triples.map(_._2).removeDuplicates
         props.filterNot(p => Util.getPropertiesToRemove.contains(p))
-//        val indexR = options.indexOf("-R")
-//        if (indexR + 1 < options.length) {
-//          try {
-//            val no = Integer.parseInt(options(indexR + 1))
-//            val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
-//              .toList.sortBy({ _._2 }).reverse.map(_._1)
-//            sortedPropList.slice(no, sortedPropList.length)
-//          } catch {
-//            case t: Exception => triples.map(_._2).removeDuplicates
-//          }
-//        } else triples.map(_._2).removeDuplicates
+        //        val indexR = options.indexOf("-R")
+        //        if (indexR + 1 < options.length) {
+        //          try {
+        //            val no = Integer.parseInt(options(indexR + 1))
+        //            val sortedPropList = triples.groupBy(_._2).map(t => (t._1, t._2.length))
+        //              .toList.sortBy({ _._2 }).reverse.map(_._1)
+        //            sortedPropList.slice(no, sortedPropList.length)
+        //          } catch {
+        //            case t: Exception => triples.map(_._2).removeDuplicates
+        //          }
+        //        } else triples.map(_._2).removeDuplicates
       } else triples.map(_._2).removeDuplicates
     }
 

@@ -2,6 +2,10 @@ import org.joda.time.format.DateTimeFormatter
 
 object Tests {
 
+val liste = List("A", "C", "B").sortBy(p => p)    //> liste  : List[String] = List(A, B, C)
+
+val mod = 9 %(2)                                  //> mod  : Int = 1
+
   import org.joda.time.DateTime
   println("Welcome to the Scala worksheet")       //> Welcome to the Scala worksheet
 

@@ -80,6 +80,8 @@ object SimpleCountController extends App {
         ("", "", "")
       }
     })
+    
+    val label = listTriples.head._1.split("/").last
 
     val optionsList: List[Array[String]] = List(Array[String]("-O","-S", "interval", "-N", "3", "-R", "7"),
       Array[String]("-O","-S", "interval", "-N", "3"),
@@ -94,7 +96,7 @@ object SimpleCountController extends App {
 
       val resList = SimpleCounter.getRankedTriples(listTriples, countRes)
 
-      SimpleCounter.printResults(resList, options)
+      SimpleCounter.printResults(resList, options, label)
 
       resList.map(r => println(r))
 
