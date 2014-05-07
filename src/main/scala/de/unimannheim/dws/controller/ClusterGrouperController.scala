@@ -14,11 +14,11 @@ import de.unimannheim.dws.algorithms.RankingAlgorithm
 object ClusterGrouperController extends App {
   DbConn.openConn withSession { implicit session =>
 
-    val testFiles = List("bawü")//, "einstein", "germany", "hockenheim", "matrix")
+    val testFiles = List("bawü") //, "einstein", "germany", "hockenheim", "matrix")
 
     testFiles.foreach(f => {
       val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples.txt")
-      readPropertyPairsCluster(file)
+      readObjectPropertyPairsCluster(file)
 
     })
 
@@ -80,11 +80,10 @@ object ClusterGrouperController extends App {
         ("", "", "")
       }
     })
-    
-    val label = listTriples.head._1.split("/").last
 
-    val optionsList: List[Array[String]] = List(Array[String]("-C", "CustomKMedoids","-P","-R","7")
-        /*,
+    val entity = listTriples.head._1
+
+    val optionsList: List[Array[String]] = List(Array[String]("-C", "CustomKMedoids", "-P", "-R", "7") /*,
       Array[String]("-C", "CustomKMedoids","-P"),
       Array[String]("-C", "CustomKMedoids","-R","7"),
       Array[String]("-C", "CustomKMedoids"),
@@ -95,17 +94,77 @@ object ClusterGrouperController extends App {
       Array[String]("-C", "HierarchicalClusterer","-P","-R","7"),
       Array[String]("-C", "HierarchicalClusterer","-P"),
       Array[String]("-C", "HierarchicalClusterer","-R","7"),
-      Array[String]("-C", "HierarchicalClusterer")*/)
+      Array[String]("-C", "HierarchicalClusterer")*/ )
 
     optionsList.foreach(o => {
 
       val options = o
-      val clusterRes = ClusterGrouper.retrieve(listTriples, options)
-      clusterRes._1.map(r => println(r))
-      
+      val clusterRes = ClusterGrouper.retrieve(listTriples, options, entity)
+//      clusterRes._1.map(r => println(r))
+
       val resList = ClusterGrouper.getRankedTriples(listTriples, clusterRes._1)
 
-      ClusterGrouper.printResults(resList, options, clusterRes._2, label)
+      ClusterGrouper.printResults(resList, options, clusterRes._2, entity)
+
+      resList.map(r => println(r))
+    })
+  }
+
+  def readObjectPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+    val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
+
+    val listTriples = listLines.map(l => {
+      val split = l.split(" ").toList
+      if (split.size == 3) {
+        (split(0), split(1), split(2))
+      } else if (split.size > 3) {
+        val objectLiteral = split.slice(2, split.size).foldLeft(new StringBuilder())((i, row) => {
+          i.append(row + " ")
+        })
+        (split(0), split(1), objectLiteral.toString)
+      } else {
+        ("", "", "")
+      }
+    })
+
+    val entity = listTriples.head._1
+
+    val subjTriples = listTriples.filter(_._1.equals(entity))
+    val objTriples = listTriples.filterNot(_._1.equals(entity))
+
+    val optionsList: List[Array[String]] = List(Array[String]("-O","-C", "CustomKMedoids", "-P", "-R", "7") /*,
+      Array[String]("-C", "CustomKMedoids","-P"),
+      Array[String]("-C", "CustomKMedoids","-R","7"),
+      Array[String]("-C", "CustomKMedoids"),
+      Array[String]("-C", "DBSCAN","-P","-R","7"),
+      Array[String]("-C", "DBSCAN","-P"),
+      Array[String]("-C", "DBSCAN","-R","7"),
+      Array[String]("-C", "DBSCAN"),
+      Array[String]("-C", "HierarchicalClusterer","-P","-R","7"),
+      Array[String]("-C", "HierarchicalClusterer","-P"),
+      Array[String]("-C", "HierarchicalClusterer","-R","7"),
+      Array[String]("-C", "HierarchicalClusterer")*/ )
+
+    optionsList.foreach(o => {
+
+      val subjResList = {
+        val clusterRes = ClusterGrouper.retrieve(subjTriples, o, entity)
+//        clusterRes._1.map(r => println(r))
+        (ClusterGrouper.getRankedTriples(subjTriples, clusterRes._1), clusterRes._2)
+      }
+      
+      val objResList = {
+        val clusterRes = ClusterGrouper.retrieve(objTriples, o, entity)
+        val clusterResList = clusterRes._1.map(p => (p._1, "Object "+p._2, p._3))
+//        clusterRes._1.map(r => println(r))
+        (ClusterGrouper.getRankedTriples(objTriples, clusterResList), clusterRes._2)
+      }
+      
+      val resList = subjResList._1++objResList._1
+      val clusterInfo = subjResList._2+objResList._2
+
+      ClusterGrouper.printResults(resList, o, clusterInfo, entity)
 
       resList.map(r => println(r))
     })

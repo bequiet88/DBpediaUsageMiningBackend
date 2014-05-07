@@ -14,7 +14,7 @@ abstract class RankingAlgorithm[T, S] {
   /**
    * Retrieve data from ranking algorithm
    */
-  def retrieve(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session): S
+  def retrieve(triples: List[(String, String, String)], options: Array[String], entity: String)(implicit session: slick.driver.PostgresDriver.backend.Session): S
 
   /**
    * Sort the triples
@@ -49,8 +49,10 @@ abstract class RankingAlgorithm[T, S] {
   /**
    * Print the result to file
    */
-  def printResults(triples: List[((String, String, String), String)], options: Array[String], clusterInfo: String, label: String): Any = {
+  def printResults(triples: List[((String, String, String), String)], options: Array[String], clusterInfo: String, entity: String): Any = {
 
+    val label = entity.split("/").last
+    
     val fileName = options.foldLeft(new StringBuilder())((i, row) => {
       if (i.length() == 0) {
         if (clusterInfo.length() == 0) i.append(label + "_counter_" + row)
@@ -91,8 +93,8 @@ abstract class RankingAlgorithm[T, S] {
 
   }
 
-  def printResults(triples: List[((String, String, String), String)], options: Array[String], label: String): Any = {
-    printResults(triples, options, "", label)
+  def printResults(triples: List[((String, String, String), String)], options: Array[String], entity: String): Any = {
+    printResults(triples, options, "", entity)
   }
 
 }

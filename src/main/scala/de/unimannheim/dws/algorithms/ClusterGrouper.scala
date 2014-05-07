@@ -85,7 +85,7 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
    * possible improvements
    * 1. use index
    */
-  def retrieve(triples: List[(String, String, String)], options: Array[String])(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  def retrieve(triples: List[(String, String, String)], options: Array[String], entity: String)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     // Use only Triples with URI object - if activated
     val triplesFiltered = {
