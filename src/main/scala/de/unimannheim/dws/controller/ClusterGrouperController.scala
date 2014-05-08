@@ -10,6 +10,8 @@ import de.unimannheim.dws.algorithms.ClusterGrouper
 import java.io.File
 import scala.io.Source
 import de.unimannheim.dws.algorithms.RankingAlgorithm
+import de.unimannheim.dws.model.ExchangeRDFTriple
+import scala.collection.JavaConverters._
 
 object ClusterGrouperController extends App {
   DbConn.openConn withSession { implicit session =>
@@ -18,7 +20,7 @@ object ClusterGrouperController extends App {
 
     testFiles.foreach(f => {
       val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples.txt")
-      readObjectPropertyPairsCluster(file)
+      readObjectPropertyPairsClusterFile(file)
 
     })
 
@@ -63,7 +65,7 @@ object ClusterGrouperController extends App {
     }
   }
 
-  def readPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  private def readPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
 
@@ -100,7 +102,7 @@ object ClusterGrouperController extends App {
 
       val options = o
       val clusterRes = ClusterGrouper.retrieve(listTriples, options, entity)
-//      clusterRes._1.map(r => println(r))
+      //      clusterRes._1.map(r => println(r))
 
       val resList = ClusterGrouper.getRankedTriples(listTriples, clusterRes._1)
 
@@ -109,8 +111,24 @@ object ClusterGrouperController extends App {
       resList.map(r => println(r))
     })
   }
+  
+  def readObjectPropertyPairsClusterList(javaList: java.util.List[ExchangeRDFTriple], options: Array[String]): java.util.List[ExchangeRDFTriple] = {
+    DbConn.openConn withSession { implicit session =>
+      val scalaList = javaList.asScala.toList
 
-  def readObjectPropertyPairsCluster(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+      val entity = scalaList.head.getSub() //.split("/").last
+
+      val subjTriples = scalaList.filter(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))
+      val objTriples = scalaList.filterNot(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))
+      
+      val resList = clusterObjectPropertyPairs(subjTriples, objTriples, options, entity)
+
+      resList._1.map(t => new ExchangeRDFTriple(t._1._1, t._1._2, t._1._3, t._2)).asJava
+    }
+  }
+  
+
+  private def readObjectPropertyPairsClusterFile(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
 
@@ -133,7 +151,7 @@ object ClusterGrouperController extends App {
     val subjTriples = listTriples.filter(_._1.equals(entity))
     val objTriples = listTriples.filterNot(_._1.equals(entity))
 
-    val optionsList: List[Array[String]] = List(Array[String]("-O","-C", "CustomKMedoids", "-P", "-R", "7") /*,
+    val optionsList: List[Array[String]] = List(Array[String]("-O", "-C", "CustomKMedoids", "-P", "-R", "7") /*,
       Array[String]("-C", "CustomKMedoids","-P"),
       Array[String]("-C", "CustomKMedoids","-R","7"),
       Array[String]("-C", "CustomKMedoids"),
@@ -147,27 +165,34 @@ object ClusterGrouperController extends App {
       Array[String]("-C", "HierarchicalClusterer")*/ )
 
     optionsList.foreach(o => {
-
-      val subjResList = {
-        val clusterRes = ClusterGrouper.retrieve(subjTriples, o, entity)
-//        clusterRes._1.map(r => println(r))
-        (ClusterGrouper.getRankedTriples(subjTriples, clusterRes._1), clusterRes._2)
-      }
       
-      val objResList = {
-        val clusterRes = ClusterGrouper.retrieve(objTriples, o, entity)
-        val clusterResList = clusterRes._1.map(p => (p._1, "Object "+p._2, p._3))
-//        clusterRes._1.map(r => println(r))
-        (ClusterGrouper.getRankedTriples(objTriples, clusterResList), clusterRes._2)
-      }
-      
-      val resList = subjResList._1++objResList._1
-      val clusterInfo = subjResList._2+objResList._2
+      val resList = clusterObjectPropertyPairs(subjTriples, objTriples, o, entity)
 
-      ClusterGrouper.printResults(resList, o, clusterInfo, entity)
+      ClusterGrouper.printResults(resList._1, o, resList._2, entity)
 
-      resList.map(r => println(r))
+      resList._1.map(r => println(r))
     })
+  }
+
+  private def clusterObjectPropertyPairs(subjTriples: List[(String, String, String)], objTriples: List[(String, String, String)], options: Array[String], entity: String)(implicit session: slick.driver.PostgresDriver.backend.Session): (List[((String, String, String), String)], String) = {
+
+    val subjResList = {
+      val clusterRes = ClusterGrouper.retrieve(subjTriples, options, entity)
+      //        clusterRes._1.map(r => println(r))
+      (ClusterGrouper.getRankedTriples(subjTriples, clusterRes._1), clusterRes._2)
+    }
+
+    val objResList = {
+      val clusterRes = ClusterGrouper.retrieve(objTriples, options, entity)
+      val clusterResList = clusterRes._1.map(p => (p._1, "Object " + p._2, p._3))
+      //        clusterRes._1.map(r => println(r))
+      (ClusterGrouper.getRankedTriples(objTriples, clusterResList), clusterRes._2)
+    }
+
+    val resList = subjResList._1 ++ objResList._1
+    val clusterInfo = subjResList._2 + objResList._2
+
+    (resList, clusterInfo)
   }
 
 }

@@ -9,15 +9,17 @@ import de.unimannheim.dws.models.mongo.ClassPropertyCounter
 import de.unimannheim.dws.models.mongo.ClassPropertyCounterDAO
 import scala.io.Source
 import java.io.File
+import de.unimannheim.dws.model.ExchangeRDFTriple
+import scala.collection.JavaConverters._
 
 object SimpleCountController extends App {
   DbConn.openConn withSession { implicit session =>
 
-    val testFiles = List("bawü")//, "einstein", "germany", "hockenheim", "matrix")
+    val testFiles = List("bawü") //, "einstein", "germany", "hockenheim", "matrix")
 
     testFiles.foreach(f => {
       val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples_with_object.txt")
-      readObjectClassPropertyPairs(file)
+      readObjectClassPropertyPairsFile(file)
 
     })
     //    createClassPropertyPairs(1000)
@@ -63,7 +65,7 @@ object SimpleCountController extends App {
     }
   }
 
-  def readClassPropertyPairs(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+  private def readClassPropertyPairs(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
     val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
 
     val listTriples = listLines.map(l => {
@@ -79,20 +81,19 @@ object SimpleCountController extends App {
         ("", "", "")
       }
     })
-    
-    val entity = listTriples.head._1//.split("/").last
 
-    val optionsList: List[Array[String]] = List(Array[String]("-O","-S", "interval", "-N", "3", "-R", "7")
-        /*,
+    val entity = listTriples.head._1 //.split("/").last
+
+    val optionsList: List[Array[String]] = List(Array[String]("-O", "-S", "interval", "-N", "3", "-R", "7") /*,
       Array[String]("-O","-S", "interval", "-N", "3"),
       Array[String]("-O","-S", "frequency", "-N", "3", "-R", "7"),
-      Array[String]("-O","-S", "frequency", "-N", "3")*/)
+      Array[String]("-O","-S", "frequency", "-N", "3")*/ )
 
     optionsList.foreach(o => {
 
       val options = o
       val countRes = SimpleCounter.retrieve(listTriples, options, entity)
-//      countRes.map(r => println(r))
+      //      countRes.map(r => println(r))
 
       val resList = SimpleCounter.getRankedTriples(listTriples, countRes)
 
@@ -103,8 +104,23 @@ object SimpleCountController extends App {
     })
 
   }
-  
-  def readObjectClassPropertyPairs(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
+
+  def readObjectClassPropertyPairsList(javaList: java.util.List[ExchangeRDFTriple], options: Array[String]): java.util.List[ExchangeRDFTriple] = {
+    DbConn.openConn withSession { implicit session =>
+      val scalaList = javaList.asScala.toList
+
+      val entity = scalaList.head.getSub() //.split("/").last
+
+      val subjTriples = scalaList.filter(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))
+      val objTriples = scalaList.filterNot(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))
+      
+      val resList = countObjectClassPropertyPairs(subjTriples, objTriples, options, entity)
+
+      resList.map(t => new ExchangeRDFTriple(t._1._1, t._1._2, t._1._3, t._2)).asJava
+    }
+  }
+
+  private def readObjectClassPropertyPairsFile(file: File)(implicit session: slick.driver.PostgresDriver.backend.Session) = {
 
     val listLines: List[String] = Source.fromFile(file, "UTF-8").getLines.toList
 
@@ -121,41 +137,38 @@ object SimpleCountController extends App {
         ("", "", "")
       }
     })
-    
-    val entity = listTriples.head._1//.split("/").last
-    
-        val subjTriples = listTriples.filter(_._1.equals(entity))
+
+    val entity = listTriples.head._1 //.split("/").last
+
+    val subjTriples = listTriples.filter(_._1.equals(entity))
     val objTriples = listTriples.filterNot(_._1.equals(entity))
 
-    val optionsList: List[Array[String]] = List(Array[String]("-O","-S", "interval", "-N", "3", "-R", "7")
-        /*,
+    val optionsList: List[Array[String]] = List(Array[String]("-O", "-S", "interval", "-N", "3", "-R", "7") /*,
       Array[String]("-O","-S", "interval", "-N", "3"),
       Array[String]("-O","-S", "frequency", "-N", "3", "-R", "7"),
-      Array[String]("-O","-S", "frequency", "-N", "3")*/)
+      Array[String]("-O","-S", "frequency", "-N", "3")*/ )
 
-      
-      
     optionsList.foreach(o => {
-      
-      val subjResList = {
-        val counterRes = SimpleCounter.retrieve(subjTriples, o, entity)
-        SimpleCounter.getRankedTriples(subjTriples, counterRes)
-      }
-
-      
-      val objResList = {
-        val counterRes = SimpleCounter.retrieve(objTriples, o, entity)
-        val counterResList = counterRes.map(p => (p._1, "Object "+p._2, p._3))
-        SimpleCounter.getRankedTriples(objTriples, counterResList)
-      }
-      
-      val resList = subjResList++objResList
-
+      val resList = countObjectClassPropertyPairs(subjTriples, objTriples, o, entity)
       SimpleCounter.printResults(resList, o, entity)
-
       resList.map(r => println(r))
-
     })
+
+  }
+
+  private def countObjectClassPropertyPairs(subjTriples: List[(String, String, String)], objTriples: List[(String, String, String)], options: Array[String], entity: String)(implicit session: slick.driver.PostgresDriver.backend.Session): List[((String, String, String), String)] = {
+    val subjResList = {
+      val counterRes = SimpleCounter.retrieve(subjTriples, options, entity)
+      SimpleCounter.getRankedTriples(subjTriples, counterRes)
+    }
+
+    val objResList = {
+      val counterRes = SimpleCounter.retrieve(objTriples, options, entity)
+      val counterResList = counterRes.map(p => (p._1, "Object " + p._2, p._3))
+      SimpleCounter.getRankedTriples(objTriples, counterResList)
+    }
+
+    subjResList ++ objResList
 
   }
 
