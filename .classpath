@@ -15,7 +15,6 @@
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.mongodb/casbah-query_2.10/jars/casbah-query_2.10-2.6.5.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.mongodb/casbah-gridfs_2.10/jars/casbah-gridfs_2.10-2.6.5.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/com.novus/salat-util_2.10/jars/salat-util_2.10-1.9.5.jar"/>
-	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.slf4j/slf4j-api/jars/slf4j-api-1.7.2.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.scala-lang/scalap/jars/scalap-2.10.3.jar"/>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_COMPILER_CONTAINER"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/com.novus/salat-core_2.10/jars/salat-core_2.10-1.9.5.jar"/>
@@ -26,10 +25,8 @@
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.mockito/mockito-all/jars/mockito-all-1.9.0.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.apache.jena/jena-core/jars/jena-core-2.11.0.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.apache.jena/jena-iri/jars/jena-iri-1.0.0.jar"/>
-	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.slf4j/slf4j-log4j12/jars/slf4j-log4j12-1.6.4.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/log4j/log4j/bundles/log4j-1.2.16.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/xerces/xercesImpl/jars/xercesImpl-2.11.0.jar"/>
-	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/xml-apis/xml-apis/jars/xml-apis-1.4.01.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.apache.jena/jena-arq/jars/jena-arq-2.11.0.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.apache.httpcomponents/httpclient/jars/httpclient-4.2.3.jar"/>
 	<classpathentry kind="lib" path="D:/Benutzer/Office/.ivy2/cache/org.apache.httpcomponents/httpcore/jars/httpcore-4.2.2.jar"/>

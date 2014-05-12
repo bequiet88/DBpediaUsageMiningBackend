@@ -26,7 +26,9 @@ object Util {
       "http://dbpedia.org/ontology/wikiPageRedirects",
       "http://dbpedia.org/ontology/wikiPageDisambiguates",
       "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-      "http://www.w3.org/2002/07/owl#sameAs")
+      "http://www.w3.org/2002/07/owl#sameAs",
+      "http://purl.org/dc/terms/subject",
+      "http://www.w3.org/2000/01/rdf-schema#comment")
 
   }
 

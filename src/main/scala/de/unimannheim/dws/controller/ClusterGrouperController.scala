@@ -112,11 +112,11 @@ object ClusterGrouperController extends App {
     })
   }
   
-  def readObjectPropertyPairsClusterList(javaList: java.util.List[ExchangeRDFTriple], options: Array[String]): java.util.List[ExchangeRDFTriple] = {
+  def readObjectPropertyPairsClusterList(javaList: java.util.List[ExchangeRDFTriple], options: Array[String], entity: String): java.util.List[ExchangeRDFTriple] = {
     DbConn.openConn withSession { implicit session =>
       val scalaList = javaList.asScala.toList
 
-      val entity = scalaList.head.getSub() //.split("/").last
+//      val entity = scalaList.head.getSub() //.split("/").last
 
       val subjTriples = scalaList.filter(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))
       val objTriples = scalaList.filterNot(_.getSub.equals(entity)).map(t => (t.getSub, t.getPred, t.getObj))

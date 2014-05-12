@@ -14,7 +14,7 @@ object DBpediaOntologyAccess {
   private lazy val modelSpec: OntModelSpec = OntModelSpec.OWL_MEM
   modelSpec.setDocumentManager(dm)
   private lazy val base: OntModel = ModelFactory.createOntologyModel( modelSpec )
-  base.read(FileManager.get.open("D:/ownCloud/Data/Studium/Master_Thesis/03_Libs_Docu/dbpedia_3_9_owl/dbpedia_3_9.owl"), "RDF/XML")
+  base.read(getClass().getResourceAsStream("dbpedia_3_9.owl"), "RDF/XML") // FileManager.get.open("assets/dbpedia_3_9.owl")
 
   private lazy val dbpediaModel = ModelFactory.createOntologyModel( OntModelSpec.OWL_MEM_TRANS_INF, base );
   
