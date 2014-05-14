@@ -11,6 +11,7 @@ object DbConn {
   ds.setDatabaseName("usage_mining")
   ds.setUser("postgres")
   ds.setPassword("postgres")
+  ds.setServerName("localhost")
   //  var db: Database = null
   def openConn = {
     Database.forDataSource(ds)
