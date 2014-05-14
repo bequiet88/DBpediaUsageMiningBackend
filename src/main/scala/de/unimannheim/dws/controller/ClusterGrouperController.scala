@@ -1,17 +1,17 @@
 package de.unimannheim.dws.controller
 
-import de.unimannheim.dws.models.postgre.DbConn
-import de.unimannheim.dws.preprocessing.Util
-import de.unimannheim.dws.models.postgre.Tables._
-import scala.slick.driver.PostgresDriver.simple._
-import de.unimannheim.dws.models.mongo.ClassPropertyCounter
-import de.unimannheim.dws.models.mongo.ClassPropertyCounterDAO
-import de.unimannheim.dws.algorithms.ClusterGrouper
 import java.io.File
+
+import scala.collection.JavaConverters._
 import scala.io.Source
+import scala.slick.driver.PostgresDriver.simple._
+
+import de.unimannheim.dws.algorithms.ClusterGrouper
 import de.unimannheim.dws.algorithms.RankingAlgorithm
 import de.unimannheim.dws.model.ExchangeRDFTriple
-import scala.collection.JavaConverters._
+import de.unimannheim.dws.models.postgre.DbConn
+import de.unimannheim.dws.models.postgre.Tables._
+import de.unimannheim.dws.preprocessing.Util
 
 object ClusterGrouperController extends App {
   DbConn.openConn withSession { implicit session =>

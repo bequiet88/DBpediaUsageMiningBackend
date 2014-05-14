@@ -1,16 +1,16 @@
 package de.unimannheim.dws.controller
 
-import de.unimannheim.dws.models.postgre.DbConn
-import de.unimannheim.dws.algorithms.SimpleCounter
-import de.unimannheim.dws.preprocessing.Util
-import de.unimannheim.dws.models.postgre.Tables._
-import scala.slick.driver.PostgresDriver.simple._
-import de.unimannheim.dws.models.mongo.ClassPropertyCounter
-import de.unimannheim.dws.models.mongo.ClassPropertyCounterDAO
-import scala.io.Source
 import java.io.File
-import de.unimannheim.dws.model.ExchangeRDFTriple
+
 import scala.collection.JavaConverters._
+import scala.io.Source
+import scala.slick.driver.PostgresDriver.simple._
+
+import de.unimannheim.dws.algorithms.SimpleCounter
+import de.unimannheim.dws.model.ExchangeRDFTriple
+import de.unimannheim.dws.models.postgre.DbConn
+import de.unimannheim.dws.models.postgre.Tables._
+import de.unimannheim.dws.preprocessing.Util
 
 object SimpleCountController extends App {
   DbConn.openConn withSession { implicit session =>
