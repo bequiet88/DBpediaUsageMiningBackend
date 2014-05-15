@@ -15,13 +15,13 @@ import de.unimannheim.dws.preprocessing.Util
 object SimpleCountController extends App {
   DbConn.openConn withSession { implicit session =>
 
-    val testFiles = List("bawü") //, "einstein", "germany", "hockenheim", "matrix")
-
-    testFiles.foreach(f => {
-      val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples_with_object.txt")
-      readObjectClassPropertyPairsFile(file)
-
-    })
+//    val testFiles = List("bawü") //, "einstein", "germany", "hockenheim", "matrix")
+//
+//    testFiles.foreach(f => {
+//      val file: File = new File("D:/ownCloud/Data/Studium/Master_Thesis/04_Data_Results/testdata/" + f + "_test_triples_with_object.txt")
+//      readObjectClassPropertyPairsFile(file)
+//
+//    })
     //    createClassPropertyPairs(1000)
 
   }

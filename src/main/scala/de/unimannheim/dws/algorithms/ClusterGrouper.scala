@@ -108,12 +108,14 @@ object ClusterGrouper extends RankingAlgorithm[PairCounterRow, (List[(String, St
     val distanceMatrix = calculateDistanceMatrix(triplesFiltered, options)
 
     // Prints a Pajek compatible net
-    printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
-    printDistanceMatrix(triples.head._1, distanceMatrix._1)
+//    printDistanceMatrixAsNet(triples.head._1, distanceMatrix._2, distanceMatrix._4)
+//    printDistanceMatrix(triples.head._1, distanceMatrix._1)
 
     // Pushes the Distance Matrix to the Interoperability Class
     DistanceMatrix.setDistanceMatrix(convertDistanceMatrixToWeka(distanceMatrix._1))
 
+    
+    
     /*
      * Instantiate WEKA, see 
      * - http://weka.wikispaces.com/Creating+an+ARFF+file
